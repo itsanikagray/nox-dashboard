@@ -115,6 +115,7 @@ Return ONLY the post text. No preamble, no labels, no quotation marks.`;
       const [notes, setNotes] = useState("");
       const [platforms, setPlatforms] = useState({ x: true, reddit: true });
       const [adapted, setAdapted] = useState(false);
+      const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().split("T")[0]);
       const [scheduledTime, setScheduledTime] = useState("09:00");
       const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
       const [generating, setGenerating] = useState(false);
@@ -163,7 +164,7 @@ Return ONLY the post text. No preamble, no labels, no quotation marks.`;
         const newItem = {
           topic: topic || notes.slice(0, 60) + "...",
           mode, platforms: { ...platforms }, adapted,
-          scheduled: scheduledTime, status: "queued",
+          scheduled: scheduledTime, scheduledDate: scheduledDate, status: "queued",
           xCopy: preview.x, redditCopy: preview.reddit,
           imageUrl: imagePreviewUrl || null,
         };
@@ -283,10 +284,11 @@ Return ONLY the post text. No preamble, no labels, no quotation marks.`;
                 </div>
 
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 14 }}>Schedule Time</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <input type="time" className="input-field" style={{ width: 160, height: 48, fontFamily: "'DM Mono', monospace", fontSize: 16, letterSpacing: 2, color: "#c9a87c" }} value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} />
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1.5, color: "#444" }}>exact time, down to the minute</span>
+                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 14 }}>Schedule</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    <input type="date" className="input-field" style={{ width: 180, height: 48, fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: 1, color: "#c9a87c" }} value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} min={new Date().toISOString().split("T")[0]} />
+                    <input type="time" className="input-field" style={{ width: 140, height: 48, fontFamily: "'DM Mono', monospace", fontSize: 16, letterSpacing: 2, color: "#c9a87c" }} value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} />
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1.5, color: "#444" }}>schedule days in advance</span>
                   </div>
                 </div>
 
@@ -358,7 +360,7 @@ Return ONLY the post text. No preamble, no labels, no quotation marks.`;
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 14, color: "#c8c4bc", marginBottom: 8, fontStyle: "italic" }}>"{item.topic}"</div>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#c9a87c" }}>{item.scheduled}</span>
+                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#c9a87c" }}>{item.scheduledDate ? item.scheduledDate + " " : ""}{item.scheduled}</span>
                           {item.platforms && item.platforms.x && <span className="pill" style={{ background: "#1a1a1a", color: "#888" }}>X</span>}
                           {item.platforms && item.platforms.reddit && <span className="pill" style={{ background: "#1a1a1a", color: "#FF6314" }}>Reddit</span>}
                           {item.adapted && <span className="pill" style={{ background: "#151510", color: "#665a3a" }}>Adapted</span>}
