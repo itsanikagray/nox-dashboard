@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nox Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #d4d0c8; font-family: 'Georgia', serif; }
+    @keyframes blink { 0%,100%{opacity:0.2} 50%{opacity:1} }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+    .tab-btn { background: none; border: none; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #555; padding: 10px 20px; transition: color 0.2s; border-bottom: 1px solid transparent; }
+    .tab-btn.active { color: #c9a87c; border-bottom: 1px solid #c9a87c; }
+    .tab-btn:hover { color: #999; }
+    .btn-primary { background: #c9a87c; color: #0a0a0a; border: none; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; padding: 12px 28px; transition: all 0.2s; }
+    .btn-primary:hover { background: #e2c99a; }
+    .btn-primary:disabled { background: #333; color: #555; cursor: not-allowed; }
+    .btn-ghost { background: none; border: 1px solid #333; color: #777; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; padding: 8px 16px; transition: all 0.2s; }
+    .btn-ghost:hover { border-color: #666; color: #aaa; }
+    .btn-danger { background: none; border: 1px solid #5a1a1a; color: #a05050; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 1.5px; padding: 6px 12px; transition: all 0.2s; }
+    .btn-danger:hover { background: #1a0a0a; }
+    .input-field { background: #111; border: 1px solid #2a2a2a; color: #d4d0c8; font-family: 'Georgia', serif; font-size: 14px; padding: 12px 16px; width: 100%; resize: vertical; outline: none; transition: border-color 0.2s; }
+    .input-field:focus { border-color: rgba(201,168,124,0.27); }
+    .pill { display: inline-block; font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; padding: 3px 10px; border-radius: 2px; }
+    .queue-item { border: 1px solid #1e1e1e; padding: 16px 20px; margin-bottom: 8px; animation: fadeIn 0.3s ease; transition: border-color 0.2s; cursor: pointer; }
+    .queue-item:hover { border-color: #333; }
+    .platform-toggle { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid #222; cursor: pointer; transition: all 0.2s; user-select: none; }
+    .platform-toggle.active { border-color: rgba(201,168,124,0.27); background: #111; }
+    .checkbox { width: 14px; height: 14px; border: 1px solid #444; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+    .checkbox.checked { border-color: #c9a87c; color: #c9a87c; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #111; }
+    ::-webkit-scrollbar-thumb { background: #333; }
+    .preview-box { background: #0d0d0d; border: 1px solid #222; padding: 16px; animation: fadeIn 0.4s ease; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const BACKEND = "https://nox-scheduler-production.up.railway.app";
+
+    const PLATFORMS = {
+      x: { label: "X", color: "#e2e2e2" },
+      reddit: { label: "Reddit", color: "#FF6314" },
+    };
+
+    const PERSONA = "Ara Nox — dominatrix, spiritual authority, voice of reclamation. Speaks with command, wit, and sacred irreverence. Never soft. Never apologetic.";
+
+    const X_CONTEXT = `Platform: X (Twitter)
+Format rules:
+- Max 280 characters
+- Text-only posts outperform image posts on X in 2026
+- Never include external links in the post body (they kill algorithmic reach)
+- End with something that invites a reply — a question, a provocation, or an incomplete thought
+- Replies and conversation depth are weighted 13x more than likes by the X algorithm
+- Positive/assertive tone gets wider distribution than combative or negative tone
+- No hashtag spam — one hashtag max, or none at all
+- Write like a real person, not a brand. Personality over promotion.
+- Short declarative statements of power, wit, unapologetic self-possession`;
+
+    const REDDIT_CONTEXT = `Platform: Reddit
+Format rules:
+- Write a full post — 2-4 paragraphs
+- Conversational and direct, like talking to someone in person
+- Open with a hook that makes them want to read the whole thing
+- Include a genuine question or provocation at the end to drive comments
+- No corporate tone, no self-promotion language
+- Reddit rewards authenticity and substance over polish`;
+
+    async function generateCopy({ topic, notes, mode, platform, adapted }) {
+      const platformCtx = platform === "x" ? X_CONTEXT : REDDIT_CONTEXT;
+      const input = mode === "topic"
+        ? `Topic/idea to write about: "${topic}"`
+        : `Raw notes to refine: "${notes}"`;
+
+      const prompt = `You are a copy assistant for this persona:
+${PERSONA}
+
+${platformCtx}
+
+${input}
+
+${adapted ? "Fully adapt the tone, length, and format for this platform." : "Keep the core message consistent, adjusting only format minimally."}
+
+Write original copy that captures the tone, rhythm, and energy of successful Domme accounts without reproducing anyone's specific words.
+
+Return ONLY the post text. No preamble, no labels, no quotation marks.`;
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      const data = await res.json();
+      return data.content?.[0]?.text?.trim() || "";
+    }
+
+    function App() {
+      const [queue, setQueue] = useState([]);
+      const [backendOnline, setBackendOnline] = useState(null);
+      const [activeTab, setActiveTab] = useState("compose");
+      const [mode, setMode] = useState("topic");
+      const [topic, setTopic] = useState("");
+      const [notes, setNotes] = useState("");
+      const [platforms, setPlatforms] = useState({ x: true, reddit: true });
+      const [adapted, setAdapted] = useState(false);
+      const [scheduledTime, setScheduledTime] = useState("09:00");
+      const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+      const [generating, setGenerating] = useState(false);
+      const [preview, setPreview] = useState({ x: "", reddit: "" });
+      const [expandedId, setExpandedId] = useState(null);
+      const [toast, setToast] = useState(null);
+
+      const showToast = (msg, type = "info") => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3000);
+      };
+
+      useEffect(() => {
+        const fetchQueue = async () => {
+          try {
+            const res = await fetch(`${BACKEND}/queue`);
+            const data = await res.json();
+            setQueue(data);
+            setBackendOnline(true);
+          } catch {
+            setBackendOnline(false);
+          }
+        };
+        fetchQueue();
+        const interval = setInterval(fetchQueue, 30000);
+        return () => clearInterval(interval);
+      }, []);
+
+      const handleGenerate = async () => {
+        if (!topic && !notes) return;
+        setGenerating(true);
+        setPreview({ x: "", reddit: "" });
+        try {
+          const results = {};
+          if (platforms.x) results.x = await generateCopy({ topic, notes, mode, platform: "x", adapted });
+          if (platforms.reddit) results.reddit = await generateCopy({ topic, notes, mode, platform: "reddit", adapted });
+          setPreview(results);
+        } catch {
+          showToast("Generation failed.", "error");
+        }
+        setGenerating(false);
+      };
+
+      const handleQueue = async () => {
+        if (!preview.x && !preview.reddit) return;
+        const newItem = {
+          topic: topic || notes.slice(0, 60) + "...",
+          mode, platforms: { ...platforms }, adapted,
+          scheduled: scheduledTime, status: "queued",
+          xCopy: preview.x, redditCopy: preview.reddit,
+          imageUrl: imagePreviewUrl || null,
+        };
+        try {
+          const res = await fetch(`${BACKEND}/queue`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newItem),
+          });
+          const saved = await res.json();
+          setQueue(q => [...q, saved.item]);
+          setPreview({ x: "", reddit: "" });
+          setTopic(""); setNotes(""); setImagePreviewUrl(null);
+          showToast("Added to queue", "success");
+        } catch {
+          showToast("Could not reach backend.", "error");
+        }
+      };
+
+      const handlePost = async (item) => {
+        try {
+          await fetch(`${BACKEND}/post-now`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item),
+          });
+          setQueue(q => q.map(i => i.id === item.id ? { ...i, status: "posted" } : i));
+          showToast("Posted successfully", "success");
+        } catch {
+          showToast("Post failed.", "error");
+        }
+      };
+
+      const handleDelete = async (id) => {
+        try {
+          await fetch(`${BACKEND}/queue/${id}`, { method: "DELETE" });
+          setQueue(q => q.filter(i => i.id !== id));
+        } catch {
+          showToast("Could not delete.", "error");
+        }
+      };
+
+      const queuedItems = queue.filter(i => i.status === "queued");
+      const postedItems = queue.filter(i => i.status === "posted");
+
+      return (
+        <div style={{ minHeight: "100vh" }}>
+
+          {toast && (
+            <div style={{ position: "fixed", top: 24, right: 24, zIndex: 9999, background: toast.type === "error" ? "#1a0505" : "#0d1a0d", border: `1px solid ${toast.type === "error" ? "#5a1a1a" : "#1a4a1a"}`, color: toast.type === "error" ? "#c05050" : "#5a9a5a", fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: 2, padding: "12px 20px", animation: "slideIn 0.3s ease" }}>
+              {toast.msg}
+            </div>
+          )}
+
+          <header style={{ borderBottom: "1px solid #1a1a1a", padding: "24px 40px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 300, letterSpacing: 6, color: "#d4d0c8", textTransform: "uppercase" }}>NOX SIGNAL</div>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 3, color: "#444", marginTop: 4, textTransform: "uppercase" }}>Social Command Center</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: backendOnline === null ? "#555" : backendOnline ? "#4a9a4a" : "#9a4a4a" }} />
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#444" }}>
+                  {backendOnline === null ? "connecting..." : backendOnline ? "backend online" : "backend offline"}
+                </span>
+              </div>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#333" }}>{queuedItems.length} queued</span>
+            </div>
+          </header>
+
+          <div style={{ borderBottom: "1px solid #1a1a1a", paddingLeft: 40, display: "flex" }}>
+            {["compose", "queue", "log"].map(t => (
+              <button key={t} className={`tab-btn ${activeTab === t ? "active" : ""}`} onClick={() => setActiveTab(t)}>{t}</button>
+            ))}
+          </div>
+
+          <main style={{ maxWidth: 820, margin: "0 auto", padding: "40px" }}>
+
+            {activeTab === "compose" && (
+              <div style={{ animation: "fadeIn 0.4s ease" }}>
+
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 16 }}>Input Mode</div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                    {["topic", "notes"].map(m => (
+                      <button key={m} onClick={() => setMode(m)} style={{ background: mode === m ? "#1a1610" : "none", border: `1px solid ${mode === m ? "#c9a87c" : "#2a2a2a"}`, color: mode === m ? "#c9a87c" : "#555", fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", padding: "8px 18px", cursor: "pointer", transition: "all 0.2s" }}>
+                        {m === "topic" ? "Topic / Idea" : "Raw Notes"}
+                      </button>
+                    ))}
+                  </div>
+                  {mode === "topic"
+                    ? <input className="input-field" style={{ height: 52 }} placeholder="e.g. Power is not given. It is reclaimed." value={topic} onChange={e => setTopic(e.target.value)} />
+                    : <textarea className="input-field" rows={5} placeholder="Paste your raw thoughts, fragments, or rough draft here..." value={notes} onChange={e => setNotes(e.target.value)} />
+                  }
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 28 }}>
+                  <div>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 14 }}>Platforms</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {Object.entries(PLATFORMS).map(([key, p]) => (
+                        <div key={key} className={`platform-toggle ${platforms[key] ? "active" : ""}`} onClick={() => setPlatforms(prev => ({ ...prev, [key]: !prev[key] }))}>
+                          <div className={`checkbox ${platforms[key] ? "checked" : ""}`}>{platforms[key] ? "✓" : ""}</div>
+                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: 1, color: platforms[key] ? p.color : "#444" }}>{p.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 14 }}>Options</div>
+                    <div className={`platform-toggle ${adapted ? "active" : ""}`} onClick={() => setAdapted(!adapted)}>
+                      <div className={`checkbox ${adapted ? "checked" : ""}`}>{adapted ? "✓" : ""}</div>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: 1, color: adapted ? "#c9a87c" : "#444" }}>Platform-adapt copy</span>
+                    </div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333", marginTop: 10, lineHeight: 1.6 }}>X gets punchy. Reddit gets depth.</div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 14 }}>Schedule Time</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <input type="time" className="input-field" style={{ width: 160, height: 48, fontFamily: "'DM Mono', monospace", fontSize: 16, letterSpacing: 2, color: "#c9a87c" }} value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} />
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1.5, color: "#444" }}>exact time, down to the minute</span>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 14 }}>
+                    Image <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", letterSpacing: 1, textTransform: "none" }}>(optional)</span>
+                  </div>
+                  {!imagePreviewUrl ? (
+                    <label style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
+                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) setImagePreviewUrl(URL.createObjectURL(f)); }} />
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, color: "#555", textTransform: "uppercase" }}>+ Upload Image</span>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333" }}>jpg, png, gif, webp</span>
+                    </label>
+                  ) : (
+                    <div style={{ position: "relative", display: "inline-block" }}>
+                      <img src={imagePreviewUrl} alt="preview" style={{ maxHeight: 200, maxWidth: "100%", border: "1px solid #2a2a2a", display: "block" }} />
+                      <button onClick={() => setImagePreviewUrl(null)} style={{ position: "absolute", top: 8, right: 8, background: "rgba(10,10,10,0.85)", border: "1px solid #5a1a1a", color: "#a05050", fontFamily: "'DM Mono', monospace", fontSize: 10, padding: "4px 10px", cursor: "pointer" }}>Remove</button>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: 36 }}>
+                  <button className="btn-primary" onClick={handleGenerate} disabled={generating || (!topic && !notes) || (!platforms.x && !platforms.reddit)}>
+                    {generating ? "Generating..." : "Generate Copy"}
+                  </button>
+                </div>
+
+                {(preview.x || preview.reddit) && (
+                  <div style={{ animation: "fadeIn 0.5s ease" }}>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 6 }}>Edit Before Queuing</div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1.5, color: "#444", marginBottom: 16 }}>AI wrote this. Make it yours.</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 20 }}>
+                      {preview.x && (
+                        <div className="preview-box">
+                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#555", marginBottom: 10 }}>X / TWITTER</div>
+                          <textarea className="input-field" rows={4} value={preview.x} onChange={e => setPreview(p => ({ ...p, x: e.target.value }))} style={{ fontSize: 14, lineHeight: 1.65, color: "#c8c4bc", background: "transparent", border: "none", borderTop: "1px solid #1e1e1e", paddingTop: 12, marginTop: 4, resize: "vertical" }} />
+                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: preview.x.length > 280 ? "#c05050" : "#444", marginTop: 6 }}>{preview.x.length}/280{preview.x.length > 280 ? " — over limit" : ""}</div>
+                        </div>
+                      )}
+                      {preview.reddit && (
+                        <div className="preview-box">
+                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#555", marginBottom: 10 }}>REDDIT</div>
+                          <textarea className="input-field" rows={6} value={preview.reddit} onChange={e => setPreview(p => ({ ...p, reddit: e.target.value }))} style={{ fontSize: 13, lineHeight: 1.75, color: "#c8c4bc", background: "transparent", border: "none", borderTop: "1px solid #1e1e1e", paddingTop: 12, marginTop: 4, resize: "vertical" }} />
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button className="btn-primary" onClick={handleQueue}>Add to Queue</button>
+                      <button className="btn-ghost" onClick={handleGenerate}>Regenerate</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "queue" && (
+              <div style={{ animation: "fadeIn 0.4s ease" }}>
+                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 300, letterSpacing: 4, color: "#888", textTransform: "uppercase", marginBottom: 24 }}>
+                  Queued · {queuedItems.length}
+                </div>
+                {queuedItems.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: 2, color: "#333" }}>
+                    QUEUE IS EMPTY — COMPOSE A POST
+                  </div>
+                )}
+                {queuedItems.map(item => (
+                  <div key={item.id} className="queue-item" onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, color: "#c8c4bc", marginBottom: 8, fontStyle: "italic" }}>"{item.topic}"</div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#c9a87c" }}>{item.scheduled}</span>
+                          {item.platforms && item.platforms.x && <span className="pill" style={{ background: "#1a1a1a", color: "#888" }}>X</span>}
+                          {item.platforms && item.platforms.reddit && <span className="pill" style={{ background: "#1a1a1a", color: "#FF6314" }}>Reddit</span>}
+                          {item.adapted && <span className="pill" style={{ background: "#151510", color: "#665a3a" }}>Adapted</span>}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginLeft: 16 }}>
+                        <button className="btn-ghost" onClick={e => { e.stopPropagation(); handlePost(item); }}>Post Now</button>
+                        <button className="btn-danger" onClick={e => { e.stopPropagation(); handleDelete(item.id); }}>✕</button>
+                      </div>
+                    </div>
+                    {expandedId === item.id && (
+                      <div style={{ marginTop: 16, borderTop: "1px solid #1a1a1a", paddingTop: 16 }}>
+                        {item.imageUrl && (
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", letterSpacing: 2, marginBottom: 6 }}>IMAGE</div>
+                            <img src={item.imageUrl} alt="post" style={{ maxHeight: 120, maxWidth: "100%", border: "1px solid #2a2a2a" }} />
+                          </div>
+                        )}
+                        {item.xCopy && (
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", letterSpacing: 2, marginBottom: 6 }}>X COPY</div>
+                            <div style={{ fontSize: 13, color: "#998f80", lineHeight: 1.65 }}>{item.xCopy}</div>
+                          </div>
+                        )}
+                        {item.redditCopy && (
+                          <div>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", letterSpacing: 2, marginBottom: 6 }}>REDDIT COPY</div>
+                            <div style={{ fontSize: 13, color: "#998f80", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{item.redditCopy}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeTab === "log" && (
+              <div style={{ animation: "fadeIn 0.4s ease" }}>
+                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 300, letterSpacing: 4, color: "#888", textTransform: "uppercase", marginBottom: 24 }}>Post Log</div>
+                {postedItems.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: 2, color: "#333" }}>NO POSTS YET</div>
+                )}
+                {postedItems.map(item => (
+                  <div key={item.id} style={{ borderBottom: "1px solid #151515", padding: "14px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 13, color: "#777", fontStyle: "italic", marginBottom: 4 }}>"{item.topic}"</div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {item.platforms && item.platforms.x && <span className="pill" style={{ background: "#1a1a1a", color: "#888" }}>X</span>}
+                        {item.platforms && item.platforms.reddit && <span className="pill" style={{ background: "#1a1a1a", color: "#FF6314" }}>Reddit</span>}
+                      </div>
+                    </div>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333", letterSpacing: 1 }}>{item.scheduled}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+          </main>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
