@@ -24,6 +24,8 @@
     .btn-ghost:hover { border-color: #666; color: #aaa; }
     .btn-danger { background: none; border: 1px solid #5a1a1a; color: #a05050; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 1.5px; padding: 6px 12px; transition: all 0.2s; }
     .btn-danger:hover { background: #1a0a0a; }
+    .btn-success { background: none; border: 1px solid #1a4a1a; color: #5a9a5a; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 1.5px; padding: 6px 12px; transition: all 0.2s; }
+    .btn-success:hover { background: #0a1a0a; }
     .input-field { background: #111; border: 1px solid #2a2a2a; color: #d4d0c8; font-family: 'Georgia', serif; font-size: 14px; padding: 12px 16px; width: 100%; resize: vertical; outline: none; transition: border-color 0.2s; }
     .input-field:focus { border-color: rgba(201,168,124,0.27); }
     .pill { display: inline-block; font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; padding: 3px 10px; border-radius: 2px; }
@@ -37,6 +39,12 @@
     ::-webkit-scrollbar-track { background: #111; }
     ::-webkit-scrollbar-thumb { background: #333; }
     .preview-box { background: #0d0d0d; border: 1px solid #222; padding: 16px; animation: fadeIn 0.4s ease; }
+    .mood-btn { background: none; border: 1px solid #2a2a2a; color: #555; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; padding: 8px 16px; transition: all 0.2s; }
+    .mood-btn:hover { border-color: #555; color: #999; }
+    .mood-btn.active { border-color: #c9a87c; color: #c9a87c; background: #1a1610; }
+    .batch-card { border: 1px solid #1e1e1e; padding: 16px; margin-bottom: 10px; animation: fadeIn 0.3s ease; background: #0d0d0d; }
+    .batch-card.selected { border-color: #c9a87c44; }
+    .batch-card.queued { border-color: #1a4a1a; opacity: 0.5; }
   </style>
 </head>
 <body>
@@ -51,7 +59,25 @@
       reddit: { label: "Reddit", color: "#FF6314" },
     };
 
-    const PERSONA = `You are writing as Ara Nox — a professional dominatrix posting on X. 
+    const MOODS = {
+      feral:      { label: "Feral",       desc: "Unhinged, chaotic, piggy energy", color: "#9a4a4a" },
+      cold:       { label: "Cold",        desc: "Razor sharp, minimal, two words and done", color: "#4a7a9a" },
+      soft_cruel: { label: "Soft Cruel",  desc: "Warm but with teeth", color: "#9a6a9a" },
+      findom:     { label: "Findom",      desc: "Casual about money, never thirsty", color: "#c9a87c" },
+      slice:      { label: "Slice of Life", desc: "Personal, offhand, no explanation", color: "#6a9a6a" },
+      royal:      { label: "Royal",       desc: "Elevated, untouchable, speaks and expects obedience", color: "#a87cc9" },
+    };
+
+    const MOOD_PROMPTS = {
+      feral: "MOOD: FERAL. Chaotic, playful, unhinged energy. Think: 'Heeeeere piggy piggy piggy.' Silly cruelty. Animal sounds. Pure id. Short and weird.",
+      cold: "MOOD: COLD. Minimal. Devastating. One or two sentences maximum. No warmth. Just the fact. Like: 'SEND ME MONEY, STUPID.' or 'Kneel.' Cold water.",
+      soft_cruel: "MOOD: SOFT CRUEL. Warm underneath but with teeth. Calls them puppy or baby. Affectionate and controlling at once. Like: 'You can always come home, puppy.' Makes them feel wanted and owned simultaneously.",
+      findom: "MOOD: FINDOM. Money is mentioned casually, the way you'd mention weather. Not begging. Not announcing. Just matter-of-fact. Like: 'Oh you wanna get to know me? That costs money, honey.' Or: 'Good morning to all the teeny weeny boys working hard for my money.'",
+      slice: "MOOD: SLICE OF LIFE. A real moment, shared without context or explanation. Personal and specific. Like: 'I still have one of the chastity keys of one of my former subs. If I ever get the chance, I'm stealing the other key.' Or: 'Yes luxury bags are nice but I want a garden.'",
+      royal: "MOOD: ROYAL. Elevated, untouchable. She doesn't raise her voice because she doesn't need to. Speaks and expects to be obeyed. Dignified cruelty. Thinks of herself as the only logical authority in the room.",
+    };
+
+    const PERSONA = `You are writing as Ara Nox — a professional dominatrix posting on X.
 
 Study these real posts from her account carefully. This is exactly how she sounds:
 
@@ -66,7 +92,6 @@ Study these real posts from her account carefully. This is exactly how she sound
 "If you won't put in the effort to type a full sentence, statistically speaking, your bank account will also reflect that lack of effort. And I don't wanna deal with that."
 "I could absolutely date a sub, but I'm also not monogamous."
 "Yes luxury bags are nice but I want a garden."
-"How do you think I became a Domme?" (in response to "Girls can have mommy issues too")
 "Good morning! Dispense!"
 "Heeeeeeere piggy piggy piggy piggy piggyyyyyyyyy"
 "I know you just want to be a mindless money-making machine for me and I want to stuff my gym socks in your mouth. It's a perfect match."
@@ -91,46 +116,20 @@ Voice rules:
 Write in this exact voice. Primitive when primitive is right. Sharp when sharp is right. Always short. Always hers.`;
 
     const X_CONTEXT = `Platform: X (Twitter)
-Format rules:
 - Max 280 characters
-- Text-only posts outperform image posts on X in 2026
-- Never include external links in the post body (they kill algorithmic reach)
+- Text-only
+- No external links
 - Do NOT force a question at the end. Commands, statements, and taunts also get replies.
-- A one-word post can outperform a paragraph. Trust the instinct to be brief.
-- Replies come naturally when the post makes someone feel something -- no question required.
-- Positive/assertive tone gets wider distribution than combative or negative tone
-- No hashtag spam — one hashtag max, or none at all
-- Write like a real person, not a brand. Personality over promotion.
-- Short declarative statements of power, wit, unapologetic self-possession`;
+- A one-word post can outperform a paragraph. Trust the instinct to be brief.`;
 
     const REDDIT_CONTEXT = `Platform: Reddit
-Format rules:
-- Write a full post — 2-4 paragraphs
-- Conversational and direct, like talking to someone in person
-- Open with a hook that makes them want to read the whole thing
-- Include a genuine question or provocation at the end to drive comments
-- No corporate tone, no self-promotion language
-- Reddit rewards authenticity and substance over polish`;
+- Write a full post -- 2-4 paragraphs
+- Conversational and direct
+- Open with a hook
+- End with a provocation or question to drive comments
+- Authentic, not polished`;
 
-    async function generateCopy({ topic, notes, mode, platform, adapted }) {
-      const platformCtx = platform === "x" ? X_CONTEXT : REDDIT_CONTEXT;
-      const input = mode === "topic"
-        ? `Topic/idea to write about: "${topic}"`
-        : `Raw notes to refine: "${notes}"`;
-
-      const prompt = `You are a copy assistant for this persona:
-${PERSONA}
-
-${platformCtx}
-
-${input}
-
-${adapted ? "Fully adapt the tone, length, and format for this platform." : "Keep the core message consistent, adjusting only format minimally."}
-
-Write original copy that captures the tone, rhythm, and energy of successful Domme accounts without reproducing anyone's specific words.
-
-Return ONLY the post text. No preamble, no labels, no quotation marks.`;
-
+    async function callGenerate(prompt) {
       const res = await fetch(`${BACKEND}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -140,20 +139,65 @@ Return ONLY the post text. No preamble, no labels, no quotation marks.`;
       return data.text || "";
     }
 
+    async function generateBatch({ mood, topic, notes, mode, platform, count }) {
+      const moodPrompt = MOOD_PROMPTS[mood] || "";
+      const platformCtx = platform === "x" ? X_CONTEXT : REDDIT_CONTEXT;
+      const input = mode === "topic" && topic
+        ? `Topic/theme to riff on (optional, don't force it): "${topic}"`
+        : mode === "notes" && notes
+        ? `Raw notes to draw from: "${notes}"`
+        : "No specific topic — generate freely in this mood.";
+
+      const prompt = `${PERSONA}
+
+${moodPrompt}
+
+${platformCtx}
+
+${input}
+
+Generate exactly ${count} completely different posts in this mood. Each should feel distinct -- different angle, different energy, different length.
+
+Format your response as a numbered list like this:
+1. [post text]
+2. [post text]
+3. [post text]
+
+Only the post text after the number. No labels, no quotes, no explanation.`;
+
+      const raw = await callGenerate(prompt);
+
+      // Parse numbered list
+      const lines = raw.split('\n').filter(l => l.trim());
+      const posts = [];
+      for (const line of lines) {
+        const match = line.match(/^\d+\.\s*(.+)/);
+        if (match) posts.push(match[1].trim());
+      }
+      return posts.length > 0 ? posts : [raw];
+    }
+
     function App() {
       const [queue, setQueue] = useState([]);
       const [backendOnline, setBackendOnline] = useState(null);
       const [activeTab, setActiveTab] = useState("compose");
+
+      // Compose state
       const [mode, setMode] = useState("topic");
       const [topic, setTopic] = useState("");
       const [notes, setNotes] = useState("");
-      const [platforms, setPlatforms] = useState({ x: true, reddit: true });
+      const [selectedMood, setSelectedMood] = useState("cold");
+      const [platforms, setPlatforms] = useState({ x: true, reddit: false });
       const [adapted, setAdapted] = useState(false);
+      const [batchCount, setBatchCount] = useState(6);
       const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().split("T")[0]);
       const [scheduledTime, setScheduledTime] = useState("09:00");
       const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
       const [generating, setGenerating] = useState(false);
-      const [preview, setPreview] = useState({ x: "", reddit: "" });
+
+      // Batch results
+      const [batchResults, setBatchResults] = useState([]); // [{id, xText, redditText, queued}]
+
       const [expandedId, setExpandedId] = useState(null);
       const [toast, setToast] = useState(null);
 
@@ -179,29 +223,48 @@ Return ONLY the post text. No preamble, no labels, no quotation marks.`;
       }, []);
 
       const handleGenerate = async () => {
-        if (!topic && !notes) return;
         setGenerating(true);
-        setPreview({ x: "", reddit: "" });
+        setBatchResults([]);
         try {
-          const results = {};
-          if (platforms.x) results.x = await generateCopy({ topic, notes, mode, platform: "x", adapted });
-          if (platforms.reddit) results.reddit = await generateCopy({ topic, notes, mode, platform: "reddit", adapted });
-          setPreview(results);
-        } catch {
+          const activePlatforms = Object.entries(platforms).filter(([,v]) => v).map(([k]) => k);
+          if (activePlatforms.length === 0) { showToast("Select at least one platform.", "error"); setGenerating(false); return; }
+
+          let xPosts = [], redditPosts = [];
+
+          if (platforms.x) {
+            xPosts = await generateBatch({ mood: selectedMood, topic, notes, mode, platform: "x", count: batchCount });
+          }
+          if (platforms.reddit) {
+            redditPosts = await generateBatch({ mood: selectedMood, topic, notes, mode, platform: "reddit", count: batchCount });
+          }
+
+          const today = new Date().toISOString().split("T")[0];
+          const count = Math.max(xPosts.length, redditPosts.length, batchCount);
+          const results = Array.from({ length: count }, (_, i) => ({
+            id: Date.now() + i,
+            xText: xPosts[i] || "",
+            redditText: redditPosts[i] || "",
+            queued: false,
+            date: today,
+            time: "09:00",
+          }));
+          setBatchResults(results);
+        } catch (e) {
           showToast("Generation failed.", "error");
         }
         setGenerating(false);
       };
 
-      const handleQueue = async () => {
-        if (!preview.x && !preview.reddit) return;
+      const handleQueueOne = async (item, idx) => {
         const newItem = {
-          topic: topic || notes.slice(0, 60) + "...",
-          mode, platforms: { ...platforms }, adapted,
-          scheduled: scheduledTime,
-          scheduledDate: scheduledDate,
+          topic: topic || `${MOODS[selectedMood].label} post`,
+          platforms: { ...platforms },
+          adapted,
+          scheduled: item.time || scheduledTime,
+          scheduledDate: item.date || scheduledDate,
           status: "queued",
-          xCopy: preview.x, redditCopy: preview.reddit,
+          xCopy: item.xText,
+          redditCopy: item.redditText,
           imageUrl: imagePreviewUrl || null,
         };
         try {
@@ -212,12 +275,19 @@ Return ONLY the post text. No preamble, no labels, no quotation marks.`;
           });
           const saved = await res.json();
           setQueue(q => [...q, saved.item]);
-          setPreview({ x: "", reddit: "" });
-          setTopic(""); setNotes(""); setImagePreviewUrl(null);
+          setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, queued: true } : r));
           showToast("Added to queue", "success");
         } catch {
           showToast("Could not reach backend.", "error");
         }
+      };
+
+      const handleQueueAll = async () => {
+        const unqueued = batchResults.filter(r => !r.queued);
+        for (let i = 0; i < unqueued.length; i++) {
+          await handleQueueOne(unqueued[i], batchResults.indexOf(unqueued[i]));
+        }
+        showToast(`Queued ${unqueued.length} posts`, "success");
       };
 
       const handlePost = async (item) => {
@@ -277,104 +347,166 @@ Return ONLY the post text. No preamble, no labels, no quotation marks.`;
             ))}
           </div>
 
-          <main style={{ maxWidth: 820, margin: "0 auto", padding: "40px" }}>
+          <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px" }}>
 
             {activeTab === "compose" && (
               <div style={{ animation: "fadeIn 0.4s ease" }}>
 
-                <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 16 }}>Input Mode</div>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                {/* MOOD PRESETS */}
+                <div style={{ marginBottom: 32 }}>
+                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 16 }}>Mood</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {Object.entries(MOODS).map(([key, mood]) => (
+                      <button key={key} className={`mood-btn ${selectedMood === key ? "active" : ""}`} onClick={() => setSelectedMood(key)}
+                        style={{ borderColor: selectedMood === key ? mood.color : undefined, color: selectedMood === key ? mood.color : undefined, background: selectedMood === key ? `${mood.color}11` : undefined }}>
+                        {mood.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginTop: 10, letterSpacing: 1.5 }}>
+                    {MOODS[selectedMood].desc}
+                  </div>
+                </div>
+
+                {/* INPUT */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 14 }}>
+                    Topic / Notes <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333", letterSpacing: 1, textTransform: "none" }}>(optional — leave blank to generate freely)</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                     {["topic", "notes"].map(m => (
-                      <button key={m} onClick={() => setMode(m)} style={{ background: mode === m ? "#1a1610" : "none", border: `1px solid ${mode === m ? "#c9a87c" : "#2a2a2a"}`, color: mode === m ? "#c9a87c" : "#555", fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", padding: "8px 18px", cursor: "pointer", transition: "all 0.2s" }}>
-                        {m === "topic" ? "Topic / Idea" : "Raw Notes"}
+                      <button key={m} onClick={() => setMode(m)} style={{ background: mode === m ? "#1a1610" : "none", border: `1px solid ${mode === m ? "#c9a87c" : "#2a2a2a"}`, color: mode === m ? "#c9a87c" : "#555", fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", padding: "6px 14px", cursor: "pointer", transition: "all 0.2s" }}>
+                        {m === "topic" ? "Topic" : "Raw Notes"}
                       </button>
                     ))}
                   </div>
                   {mode === "topic"
-                    ? <input className="input-field" style={{ height: 52 }} placeholder="e.g. Power is not given. It is reclaimed." value={topic} onChange={e => setTopic(e.target.value)} />
-                    : <textarea className="input-field" rows={5} placeholder="Paste your raw thoughts, fragments, or rough draft here..." value={notes} onChange={e => setNotes(e.target.value)} />
+                    ? <input className="input-field" style={{ height: 48 }} placeholder="e.g. men who think they can negotiate" value={topic} onChange={e => setTopic(e.target.value)} />
+                    : <textarea className="input-field" rows={3} placeholder="Paste rough thoughts, a vibe, a real thing that happened..." value={notes} onChange={e => setNotes(e.target.value)} />
                   }
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 28 }}>
+                {/* PLATFORMS + OPTIONS */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20, marginBottom: 24 }}>
                   <div>
-                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 14 }}>Platforms</div>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 12 }}>Platforms</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {Object.entries(PLATFORMS).map(([key, p]) => (
                         <div key={key} className={`platform-toggle ${platforms[key] ? "active" : ""}`} onClick={() => setPlatforms(prev => ({ ...prev, [key]: !prev[key] }))}>
-                          <div className={`checkbox ${platforms[key] ? "checked" : ""}`}>{platforms[key] ? "✓" : ""}</div>
-                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: 1, color: platforms[key] ? p.color : "#444" }}>{p.label}</span>
+                          <div className={`checkbox ${platforms[key] ? "checked" : ""}`}>{platforms[key] ? "v" : ""}</div>
+                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: platforms[key] ? p.color : "#444" }}>{p.label}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 14 }}>Options</div>
-                    <div className={`platform-toggle ${adapted ? "active" : ""}`} onClick={() => setAdapted(!adapted)}>
-                      <div className={`checkbox ${adapted ? "checked" : ""}`}>{adapted ? "✓" : ""}</div>
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: 1, color: adapted ? "#c9a87c" : "#444" }}>Platform-adapt copy</span>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 12 }}>Batch Size</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {[3, 6, 9].map(n => (
+                        <button key={n} onClick={() => setBatchCount(n)} style={{ background: batchCount === n ? "#1a1610" : "none", border: `1px solid ${batchCount === n ? "#c9a87c" : "#2a2a2a"}`, color: batchCount === n ? "#c9a87c" : "#555", fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "6px 14px", cursor: "pointer", transition: "all 0.2s" }}>
+                          {n}
+                        </button>
+                      ))}
                     </div>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333", marginTop: 10, lineHeight: 1.6 }}>X gets punchy. Reddit gets depth.</div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333", marginTop: 8 }}>posts per session</div>
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 12 }}>Options</div>
+                    <div className={`platform-toggle ${adapted ? "active" : ""}`} onClick={() => setAdapted(!adapted)}>
+                      <div className={`checkbox ${adapted ? "checked" : ""}`}>{adapted ? "v" : ""}</div>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: adapted ? "#c9a87c" : "#444" }}>Adapt per platform</span>
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 14 }}>Schedule</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                    <input type="date" className="input-field" style={{ width: 180, height: 48, fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: 1, color: "#c9a87c" }} value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} min={new Date().toISOString().split("T")[0]} />
-                    <input type="time" className="input-field" style={{ width: 140, height: 48, fontFamily: "'DM Mono', monospace", fontSize: 16, letterSpacing: 2, color: "#c9a87c" }} value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} />
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1.5, color: "#444" }}>schedule days in advance</span>
-                  </div>
-                </div>
 
-                <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 14 }}>
-                    Image <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", letterSpacing: 1, textTransform: "none" }}>(optional)</span>
-                  </div>
+
+                {/* IMAGE + GENERATE */}
+                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 36 }}>
+                  <button className="btn-primary" onClick={handleGenerate} disabled={generating || (!platforms.x && !platforms.reddit)}>
+                    {generating ? "Generating..." : `Generate ${batchCount} Posts`}
+                  </button>
                   {!imagePreviewUrl ? (
-                    <label style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
                       <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) setImagePreviewUrl(URL.createObjectURL(f)); }} />
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, color: "#555", textTransform: "uppercase" }}>+ Upload Image</span>
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333" }}>jpg, png, gif, webp</span>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#444", textTransform: "uppercase", letterSpacing: 1.5 }}>+ Image</span>
                     </label>
                   ) : (
-                    <div style={{ position: "relative", display: "inline-block" }}>
-                      <img src={imagePreviewUrl} alt="preview" style={{ maxHeight: 200, maxWidth: "100%", border: "1px solid #2a2a2a", display: "block" }} />
-                      <button onClick={() => setImagePreviewUrl(null)} style={{ position: "absolute", top: 8, right: 8, background: "rgba(10,10,10,0.85)", border: "1px solid #5a1a1a", color: "#a05050", fontFamily: "'DM Mono', monospace", fontSize: 10, padding: "4px 10px", cursor: "pointer" }}>Remove</button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <img src={imagePreviewUrl} alt="preview" style={{ height: 40, width: 40, objectFit: "cover", border: "1px solid #2a2a2a" }} />
+                      <button onClick={() => setImagePreviewUrl(null)} className="btn-danger">Remove</button>
                     </div>
                   )}
                 </div>
 
-                <div style={{ marginBottom: 36 }}>
-                  <button className="btn-primary" onClick={handleGenerate} disabled={generating || (!topic && !notes) || (!platforms.x && !platforms.reddit)}>
-                    {generating ? "Generating..." : "Generate Copy"}
-                  </button>
-                </div>
-
-                {(preview.x || preview.reddit) && (
+                {/* BATCH RESULTS */}
+                {batchResults.length > 0 && (
                   <div style={{ animation: "fadeIn 0.5s ease" }}>
-                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 6 }}>Edit Before Queuing</div>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1.5, color: "#444", marginBottom: 16 }}>AI wrote this. Make it yours.</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 20 }}>
-                      {preview.x && (
-                        <div className="preview-box">
-                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#555", marginBottom: 10 }}>X / TWITTER</div>
-                          <textarea className="input-field" rows={4} value={preview.x} onChange={e => setPreview(p => ({ ...p, x: e.target.value }))} style={{ fontSize: 14, lineHeight: 1.65, color: "#c8c4bc", background: "transparent", border: "none", borderTop: "1px solid #1e1e1e", paddingTop: 12, marginTop: 4, resize: "vertical" }} />
-                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: preview.x.length > 280 ? "#c05050" : "#444", marginTop: 6 }}>{preview.x.length}/280{preview.x.length > 280 ? " — over limit" : ""}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                      <div>
+                        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 300, letterSpacing: 4, color: "#888", textTransform: "uppercase" }}>
+                          {batchResults.length} Posts Generated
                         </div>
-                      )}
-                      {preview.reddit && (
-                        <div className="preview-box">
-                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#555", marginBottom: 10 }}>REDDIT</div>
-                          <textarea className="input-field" rows={6} value={preview.reddit} onChange={e => setPreview(p => ({ ...p, reddit: e.target.value }))} style={{ fontSize: 13, lineHeight: 1.75, color: "#c8c4bc", background: "transparent", border: "none", borderTop: "1px solid #1e1e1e", paddingTop: 12, marginTop: 4, resize: "vertical" }} />
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginTop: 4, letterSpacing: 1.5 }}>
+                          Edit · set date and time · queue
                         </div>
-                      )}
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button className="btn-ghost" onClick={handleGenerate}>Regenerate All</button>
+                        <button className="btn-primary" onClick={handleQueueAll} disabled={batchResults.every(r => r.queued)}>
+                          Queue All
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button className="btn-primary" onClick={handleQueue}>Add to Queue</button>
-                      <button className="btn-ghost" onClick={handleGenerate}>Regenerate</button>
-                    </div>
+
+                    {batchResults.map((item, idx) => (
+                      <div key={item.id} className={`batch-card ${item.queued ? "queued" : ""}`}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", letterSpacing: 2 }}>
+                            {String(idx + 1).padStart(2, "0")} · {MOODS[selectedMood].label.toUpperCase()}
+                            {item.queued && <span style={{ color: "#4a9a4a", marginLeft: 8 }}>QUEUED</span>}
+                          </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <input type="date" value={item.date} onChange={e => setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, date: e.target.value } : r))} disabled={item.queued}
+                              style={{ background: "#111", border: "1px solid #2a2a2a", color: "#c9a87c", fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "4px 8px", outline: "none", width: 140 }} />
+                            <input type="time" value={item.time} onChange={e => setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, time: e.target.value } : r))} disabled={item.queued}
+                              style={{ background: "#111", border: "1px solid #2a2a2a", color: "#c9a87c", fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "4px 8px", outline: "none", width: 100 }} />
+                            {!item.queued && (
+                              <button className="btn-success" onClick={() => handleQueueOne(item, idx)}>Queue</button>
+                            )}
+                          </div>
+                        </div>
+
+                        {item.xText && (
+                          <div style={{ marginBottom: item.redditText ? 12 : 0 }}>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", letterSpacing: 2, marginBottom: 6 }}>X</div>
+                            <textarea
+                              value={item.xText}
+                              onChange={e => setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, xText: e.target.value } : r))}
+                              disabled={item.queued}
+                              style={{ width: "100%", background: "transparent", border: "none", borderBottom: "1px solid #1e1e1e", color: "#c8c4bc", fontFamily: "'Georgia', serif", fontSize: 14, lineHeight: 1.65, padding: "8px 0", resize: "none", outline: "none", rows: 3 }}
+                              rows={Math.max(2, Math.ceil(item.xText.length / 60))}
+                            />
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: item.xText.length > 280 ? "#c05050" : "#333", marginTop: 4 }}>
+                              {item.xText.length}/280{item.xText.length > 280 ? " — over limit" : ""}
+                            </div>
+                          </div>
+                        )}
+
+                        {item.redditText && (
+                          <div>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", letterSpacing: 2, marginBottom: 6 }}>REDDIT</div>
+                            <textarea
+                              value={item.redditText}
+                              onChange={e => setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, redditText: e.target.value } : r))}
+                              disabled={item.queued}
+                              style={{ width: "100%", background: "transparent", border: "none", borderBottom: "1px solid #1e1e1e", color: "#c8c4bc", fontFamily: "'Georgia', serif", fontSize: 13, lineHeight: 1.75, padding: "8px 0", resize: "none", outline: "none" }}
+                              rows={4}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -387,46 +519,29 @@ Return ONLY the post text. No preamble, no labels, no quotation marks.`;
                 </div>
                 {queuedItems.length === 0 && (
                   <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: 2, color: "#333" }}>
-                    QUEUE IS EMPTY — COMPOSE A POST
+                    QUEUE IS EMPTY — COMPOSE A BATCH
                   </div>
                 )}
                 {queuedItems.map(item => (
                   <div key={item.id} className="queue-item" onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, color: "#c8c4bc", marginBottom: 8, fontStyle: "italic" }}>"{item.topic}"</div>
+                        <div style={{ fontSize: 14, color: "#c8c4bc", marginBottom: 8, fontStyle: "italic" }}>"{item.xCopy || item.redditCopy || item.topic}"</div>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#c9a87c" }}>{item.scheduledDate ? item.scheduledDate + " " : ""}{item.scheduled}</span>
                           {item.platforms && item.platforms.x && <span className="pill" style={{ background: "#1a1a1a", color: "#888" }}>X</span>}
                           {item.platforms && item.platforms.reddit && <span className="pill" style={{ background: "#1a1a1a", color: "#FF6314" }}>Reddit</span>}
-                          {item.adapted && <span className="pill" style={{ background: "#151510", color: "#665a3a" }}>Adapted</span>}
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 8, marginLeft: 16 }}>
                         <button className="btn-ghost" onClick={e => { e.stopPropagation(); handlePost(item); }}>Post Now</button>
-                        <button className="btn-danger" onClick={e => { e.stopPropagation(); handleDelete(item.id); }}>✕</button>
+                        <button className="btn-danger" onClick={e => { e.stopPropagation(); handleDelete(item.id); }}>x</button>
                       </div>
                     </div>
                     {expandedId === item.id && (
                       <div style={{ marginTop: 16, borderTop: "1px solid #1a1a1a", paddingTop: 16 }}>
-                        {item.imageUrl && (
-                          <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", letterSpacing: 2, marginBottom: 6 }}>IMAGE</div>
-                            <img src={item.imageUrl} alt="post" style={{ maxHeight: 120, maxWidth: "100%", border: "1px solid #2a2a2a" }} />
-                          </div>
-                        )}
-                        {item.xCopy && (
-                          <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", letterSpacing: 2, marginBottom: 6 }}>X COPY</div>
-                            <div style={{ fontSize: 13, color: "#998f80", lineHeight: 1.65 }}>{item.xCopy}</div>
-                          </div>
-                        )}
-                        {item.redditCopy && (
-                          <div>
-                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", letterSpacing: 2, marginBottom: 6 }}>REDDIT COPY</div>
-                            <div style={{ fontSize: 13, color: "#998f80", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{item.redditCopy}</div>
-                          </div>
-                        )}
+                        {item.xCopy && <div style={{ marginBottom: 10 }}><div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 4 }}>X</div><div style={{ fontSize: 13, color: "#998f80", lineHeight: 1.65 }}>{item.xCopy}</div></div>}
+                        {item.redditCopy && <div><div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 4 }}>REDDIT</div><div style={{ fontSize: 13, color: "#998f80", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{item.redditCopy}</div></div>}
                       </div>
                     )}
                   </div>
@@ -443,13 +558,13 @@ Return ONLY the post text. No preamble, no labels, no quotation marks.`;
                 {postedItems.map(item => (
                   <div key={item.id} style={{ borderBottom: "1px solid #151515", padding: "14px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
-                      <div style={{ fontSize: 13, color: "#777", fontStyle: "italic", marginBottom: 4 }}>"{item.topic}"</div>
+                      <div style={{ fontSize: 13, color: "#777", fontStyle: "italic", marginBottom: 4 }}>"{item.xCopy || item.topic}"</div>
                       <div style={{ display: "flex", gap: 8 }}>
                         {item.platforms && item.platforms.x && <span className="pill" style={{ background: "#1a1a1a", color: "#888" }}>X</span>}
                         {item.platforms && item.platforms.reddit && <span className="pill" style={{ background: "#1a1a1a", color: "#FF6314" }}>Reddit</span>}
                       </div>
                     </div>
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333", letterSpacing: 1 }}>{item.scheduledDate} {item.scheduled}</span>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333" }}>{item.scheduledDate} {item.scheduled}</span>
                   </div>
                 ))}
               </div>
