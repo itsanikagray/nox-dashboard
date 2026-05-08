@@ -93,17 +93,13 @@ Write original copy that captures the tone, rhythm, and energy of successful Dom
 
 Return ONLY the post text. No preamble, no labels, no quotation marks.`;
 
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch(`${BACKEND}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }],
-        }),
+        body: JSON.stringify({ prompt }),
       });
       const data = await res.json();
-      return data.content?.[0]?.text?.trim() || "";
+      return data.text || "";
     }
 
     function App() {
@@ -164,7 +160,9 @@ Return ONLY the post text. No preamble, no labels, no quotation marks.`;
         const newItem = {
           topic: topic || notes.slice(0, 60) + "...",
           mode, platforms: { ...platforms }, adapted,
-          scheduled: scheduledTime, scheduledDate: scheduledDate, status: "queued",
+          scheduled: scheduledTime,
+          scheduledDate: scheduledDate,
+          status: "queued",
           xCopy: preview.x, redditCopy: preview.reddit,
           imageUrl: imagePreviewUrl || null,
         };
@@ -413,7 +411,7 @@ Return ONLY the post text. No preamble, no labels, no quotation marks.`;
                         {item.platforms && item.platforms.reddit && <span className="pill" style={{ background: "#1a1a1a", color: "#FF6314" }}>Reddit</span>}
                       </div>
                     </div>
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333", letterSpacing: 1 }}>{item.scheduled}</span>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333", letterSpacing: 1 }}>{item.scheduledDate} {item.scheduled}</span>
                   </div>
                 ))}
               </div>
