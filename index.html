@@ -247,6 +247,7 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
             queued: false,
             date: today,
             time: "09:00",
+            imageUrl: null,
           }));
           setBatchResults(results);
         } catch (e) {
@@ -265,7 +266,7 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
           status: "queued",
           xCopy: item.xText,
           redditCopy: item.redditText,
-          imageUrl: imagePreviewUrl || null,
+          imageUrl: item.imageUrl || null,
         };
         try {
           const res = await fetch(`${BACKEND}/queue`, {
@@ -421,22 +422,11 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
 
 
 
-                {/* IMAGE + GENERATE */}
-                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 36 }}>
+                {/* GENERATE */}
+                <div style={{ marginBottom: 36 }}>
                   <button className="btn-primary" onClick={handleGenerate} disabled={generating || (!platforms.x && !platforms.reddit)}>
                     {generating ? "Generating..." : `Generate ${batchCount} Posts`}
                   </button>
-                  {!imagePreviewUrl ? (
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
-                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) setImagePreviewUrl(URL.createObjectURL(f)); }} />
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#444", textTransform: "uppercase", letterSpacing: 1.5 }}>+ Image</span>
-                    </label>
-                  ) : (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <img src={imagePreviewUrl} alt="preview" style={{ height: 40, width: 40, objectFit: "cover", border: "1px solid #2a2a2a" }} />
-                      <button onClick={() => setImagePreviewUrl(null)} className="btn-danger">Remove</button>
-                    </div>
-                  )}
                 </div>
 
                 {/* BATCH RESULTS */}
@@ -475,6 +465,28 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                               <button className="btn-success" onClick={() => handleQueueOne(item, idx)}>Queue</button>
                             )}
                           </div>
+                          {/* Per-post image */}
+                          {!item.queued && (
+                            <div style={{ marginTop: 8 }}>
+                              {!item.imageUrl ? (
+                                <label style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
+                                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                                    const f = e.target.files[0];
+                                    if (f) {
+                                      const url = URL.createObjectURL(f);
+                                      setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, imageUrl: url } : r));
+                                    }
+                                  }} />
+                                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", textTransform: "uppercase", letterSpacing: 1.5 }}>+ Add Image</span>
+                                </label>
+                              ) : (
+                                <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                  <img src={item.imageUrl} alt="preview" style={{ height: 36, width: 36, objectFit: "cover", border: "1px solid #2a2a2a" }} />
+                                  <button onClick={() => setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, imageUrl: null } : r))} className="btn-danger" style={{ padding: "4px 8px", fontSize: 9 }}>Remove</button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {item.xText && (
