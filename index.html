@@ -103,9 +103,10 @@ function getNextSchedule(existingQueue) {
     };
 
     const LENGTHS = {
-      short:  { label: "Short",  desc: "1-2 sentences · under 100 chars", prompt: "LENGTH: SHORT. 1-2 sentences maximum. Under 100 characters ideally. Punchy. No fat." },
-      medium: { label: "Medium", desc: "2-3 sentences · 100-200 chars",   prompt: "LENGTH: MEDIUM. 2-3 sentences. 100-200 characters. Enough to land a point, not a word more." },
-      long:   { label: "Long",   desc: "Up to 280 chars · full texture",   prompt: "LENGTH: LONG. Up to 280 characters. Use for psychology reframes, standards posts, stories with texture. Still no padding." },
+      short:  { label: "Short",  desc: "1-2 sentences · under 100 chars",  prompt: "LENGTH: SHORT. 1-2 sentences maximum. Under 100 characters. Punchy. No fat. One idea, fully landed." },
+      medium: { label: "Medium", desc: "2-4 sentences · 150-280 chars",    prompt: "LENGTH: MEDIUM. 2-4 sentences. 150-280 characters. Enough to land a point with some texture, not a word more." },
+      long:   { label: "Long",   desc: "Extended · 300-600 chars · story or rant", prompt: "LENGTH: LONG. Write 300-600 characters. This account has X Premium so the 280 limit does not apply. Use the extra space for a short story, a psychology observation with examples, a rant, or a standards post with real texture. Minimum 4 sentences. If your output is under 250 characters you have failed this instruction." },
+      thread: { label: "Thread", desc: "3 connected posts · tell a story", prompt: "LENGTH: THREAD. Write exactly 3 separate posts that connect as a thread. Number them 1/, 2/, 3/. Each post 100-250 characters. Together they tell one story, make one argument, or build one idea. The first post is the hook that makes people want to read the rest." },
     };
 
     const MOOD_PROMPTS = {
@@ -156,8 +157,8 @@ Voice rules:
 Write in this exact voice. Primitive when primitive is right. Sharp when sharp is right. Always short. Always hers.`;
 
     const X_CONTEXT = `Platform: X (Twitter)
-- Max 280 characters
 - No external links in post body
+- This account has X Premium — posts can be up to 25,000 characters, not just 280
 
 WHAT ACTUALLY PERFORMS (analysis of 790+ posts across 3 high-follower Domme accounts — 13k, 22k, and 43k followers):
 
@@ -605,8 +606,8 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                               style={{ width: "100%", background: "transparent", border: "none", borderBottom: "1px solid #1e1e1e", color: "#c8c4bc", fontFamily: "'Georgia', serif", fontSize: 14, lineHeight: 1.65, padding: "8px 0", resize: "none", outline: "none", rows: 3 }}
                               rows={Math.max(2, Math.ceil(item.xText.length / 60))}
                             />
-                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: item.xText.length > 280 ? "#c05050" : "#333", marginTop: 4 }}>
-                              {item.xText.length}/280{item.xText.length > 280 ? " — over limit" : ""}
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: item.xText.length > 25000 ? "#c05050" : "#333", marginTop: 4 }}>
+                              {item.xText.length} chars{item.xText.length > 25000 ? " — over limit" : ""}
                             </div>
                           </div>
                         )}
