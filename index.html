@@ -267,6 +267,8 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
       const [batchResults, setBatchResults] = useState([]); // [{id, xText, redditText, queued}]
 
       const [expandedId, setExpandedId] = useState(null);
+      const [editingId, setEditingId] = useState(null);
+      const [editDraft, setEditDraft] = useState({});
       const [toast, setToast] = useState(null);
       const [driveImages, setDriveImages] = useState([]);
       const [showImageLibrary, setShowImageLibrary] = useState(false);
@@ -397,6 +399,42 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
           setQueue(q => q.filter(i => i.id !== id));
         } catch {
           showToast("Could not delete.", "error");
+        }
+      };
+
+      const handleEditStart = (item) => {
+        setEditingId(item.id);
+        setEditDraft({
+          xCopy: item.xCopy || "",
+          redditCopy: item.redditCopy || "",
+          scheduled: item.scheduled || "10:00",
+          scheduledDate: item.scheduledDate || new Date().toISOString().split("T")[0],
+          imageUrl: item.imageUrl || null,
+        });
+      };
+
+      const handleSaveEdit = async (id) => {
+        try {
+          // Delete old and re-add with new data
+          const original = queue.find(i => i.id === id);
+          await fetch(`${BACKEND}/queue/${id}`, { method: "DELETE" });
+          const updated = { ...original, ...editDraft, id: Date.now() };
+          const res = await fetch(`${BACKEND}/queue`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updated),
+          });
+          const saved = await res.json();
+          setQueue(q => q.map(i => i.id === id ? saved.item : i));
+          setEditingId(null);
+          setEditDraft({});
+          showToast("Post updated", "success");
+          // Refresh queue
+          const res2 = await fetch(`${BACKEND}/queue`);
+          const data = await res2.json();
+          setQueue(data);
+        } catch {
+          showToast("Could not save changes.", "error");
         }
       };
 
@@ -662,25 +700,86 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                         <span style={{ color: "#333", marginLeft: 12 }}>{items.length} post{items.length !== 1 ? "s" : ""}</span>
                       </div>
                       {items.map(item => (
-                        <div key={item.id} className="queue-item" onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 14, color: "#c8c4bc", marginBottom: 8, fontStyle: "italic" }}>"{(item.xCopy || item.redditCopy || item.topic || "").slice(0, 80)}{(item.xCopy || item.redditCopy || "").length > 80 ? "..." : ""}"</div>
-                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#c9a87c" }}>{item.scheduled}</span>
-                                {item.platforms && item.platforms.x && <span className="pill" style={{ background: "#1a1a1a", color: "#888" }}>X</span>}
-                                {item.platforms && item.platforms.reddit && <span className="pill" style={{ background: "#1a1a1a", color: "#FF6314" }}>Reddit</span>}
+                        <div key={item.id} className="queue-item">
+                          {editingId === item.id ? (
+                            // EDIT MODE
+                            <div onClick={e => e.stopPropagation()}>
+                              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#c9a87c", letterSpacing: 2, marginBottom: 14 }}>EDITING</div>
+
+                              {item.platforms && item.platforms.x && (
+                                <div style={{ marginBottom: 12 }}>
+                                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 6 }}>X COPY</div>
+                                  <textarea value={editDraft.xCopy} onChange={e => setEditDraft(d => ({ ...d, xCopy: e.target.value }))}
+                                    style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", color: "#d4d0c8", fontFamily: "'Georgia', serif", fontSize: 13, padding: "10px 12px", resize: "vertical", outline: "none" }} rows={3} />
+                                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginTop: 4 }}>{editDraft.xCopy.length} chars</div>
+                                </div>
+                              )}
+
+                              {item.platforms && item.platforms.reddit && (
+                                <div style={{ marginBottom: 12 }}>
+                                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 6 }}>REDDIT COPY</div>
+                                  <textarea value={editDraft.redditCopy} onChange={e => setEditDraft(d => ({ ...d, redditCopy: e.target.value }))}
+                                    style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", color: "#d4d0c8", fontFamily: "'Georgia', serif", fontSize: 13, padding: "10px 12px", resize: "vertical", outline: "none" }} rows={4} />
+                                </div>
+                              )}
+
+                              <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+                                <div>
+                                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 6 }}>DATE</div>
+                                  <input type="date" value={editDraft.scheduledDate} onChange={e => setEditDraft(d => ({ ...d, scheduledDate: e.target.value }))}
+                                    style={{ background: "#111", border: "1px solid #2a2a2a", color: "#c9a87c", fontFamily: "'DM Mono', monospace", fontSize: 12, padding: "6px 10px", outline: "none" }} />
+                                </div>
+                                <div>
+                                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 6 }}>TIME</div>
+                                  <input type="time" value={editDraft.scheduled} onChange={e => setEditDraft(d => ({ ...d, scheduled: e.target.value }))}
+                                    style={{ background: "#111", border: "1px solid #2a2a2a", color: "#c9a87c", fontFamily: "'DM Mono', monospace", fontSize: 12, padding: "6px 10px", outline: "none" }} />
+                                </div>
+                                <div>
+                                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 6 }}>IMAGE</div>
+                                  {!editDraft.imageUrl ? (
+                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
+                                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) setEditDraft(d => ({ ...d, imageUrl: URL.createObjectURL(f) })); }} />
+                                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#555" }}>+ Add</span>
+                                    </label>
+                                  ) : (
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                      <img src={editDraft.imageUrl} style={{ height: 32, width: 32, objectFit: "cover", border: "1px solid #2a2a2a" }} />
+                                      <button onClick={() => setEditDraft(d => ({ ...d, imageUrl: null }))} className="btn-danger" style={{ padding: "3px 8px", fontSize: 9 }}>Remove</button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <button className="btn-primary" onClick={() => handleSaveEdit(item.id)}>Save</button>
+                                <button className="btn-ghost" onClick={() => { setEditingId(null); setEditDraft({}); }}>Cancel</button>
                               </div>
                             </div>
-                            <div style={{ display: "flex", gap: 8, marginLeft: 16 }}>
-                              <button className="btn-ghost" onClick={e => { e.stopPropagation(); handlePost(item); }}>Post Now</button>
-                              <button className="btn-danger" onClick={e => { e.stopPropagation(); handleDelete(item.id); }}>x</button>
-                            </div>
-                          </div>
-                          {expandedId === item.id && (
-                            <div style={{ marginTop: 16, borderTop: "1px solid #1a1a1a", paddingTop: 16 }}>
-                              {item.xCopy && <div style={{ marginBottom: 10 }}><div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 4 }}>X</div><div style={{ fontSize: 13, color: "#998f80", lineHeight: 1.65 }}>{item.xCopy}</div></div>}
-                              {item.redditCopy && <div><div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 4 }}>REDDIT</div><div style={{ fontSize: 13, color: "#998f80", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{item.redditCopy}</div></div>}
+                          ) : (
+                            // VIEW MODE
+                            <div onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontSize: 14, color: "#c8c4bc", marginBottom: 8, fontStyle: "italic" }}>"{(item.xCopy || item.redditCopy || item.topic || "").slice(0, 80)}{(item.xCopy || item.redditCopy || "").length > 80 ? "..." : ""}"</div>
+                                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#c9a87c" }}>{item.scheduledDate} {item.scheduled}</span>
+                                    {item.platforms && item.platforms.x && <span className="pill" style={{ background: "#1a1a1a", color: "#888" }}>X</span>}
+                                    {item.platforms && item.platforms.reddit && <span className="pill" style={{ background: "#1a1a1a", color: "#FF6314" }}>Reddit</span>}
+                                    {item.imageUrl && <span className="pill" style={{ background: "#1a1a1a", color: "#c9a87c" }}>IMG</span>}
+                                  </div>
+                                </div>
+                                <div style={{ display: "flex", gap: 8, marginLeft: 16 }}>
+                                  <button className="btn-ghost" onClick={e => { e.stopPropagation(); handleEditStart(item); }}>Edit</button>
+                                  <button className="btn-ghost" onClick={e => { e.stopPropagation(); handlePost(item); }}>Post Now</button>
+                                  <button className="btn-danger" onClick={e => { e.stopPropagation(); handleDelete(item.id); }}>x</button>
+                                </div>
+                              </div>
+                              {expandedId === item.id && (
+                                <div style={{ marginTop: 16, borderTop: "1px solid #1a1a1a", paddingTop: 16 }}>
+                                  {item.xCopy && <div style={{ marginBottom: 10 }}><div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 4 }}>X</div><div style={{ fontSize: 13, color: "#998f80", lineHeight: 1.65 }}>{item.xCopy}</div></div>}
+                                  {item.redditCopy && <div><div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 4 }}>REDDIT</div><div style={{ fontSize: 13, color: "#998f80", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{item.redditCopy}</div></div>}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
