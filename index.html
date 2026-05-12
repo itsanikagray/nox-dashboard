@@ -334,7 +334,7 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
             queued: false,
             date: today,
             time: "09:00",
-            imageUrl: null,
+            imageUrls: [],
           }));
           setBatchResults(results);
         } catch (e) {
@@ -354,7 +354,8 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
           status: "queued",
           xCopy: item.xText,
           redditCopy: item.redditText,
-          imageUrl: item.imageUrl || null,
+          imageUrls: item.imageUrls || [],
+          imageUrl: (item.imageUrls && item.imageUrls[0]) || null,
         };
         try {
           const res = await fetch(`${BACKEND}/queue`, {
@@ -409,7 +410,8 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
           redditCopy: item.redditCopy || "",
           scheduled: item.scheduled || "10:00",
           scheduledDate: item.scheduledDate || new Date().toISOString().split("T")[0],
-          imageUrl: item.imageUrl || null,
+          imageUrls: item.imageUrls || [],
+          imageUrl: (item.imageUrls && item.imageUrls[0]) || null,
         });
       };
 
@@ -596,38 +598,40 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                               <button className="btn-success" onClick={() => handleQueueOne(item, idx)}>Queue</button>
                             )}
                           </div>
-                          {/* Per-post image */}
+                          {/* Per-post images (up to 4) */}
                           {!item.queued && (
                             <div style={{ marginTop: 8 }}>
-                              {!item.imageUrl ? (
-                                <div style={{ display: "flex", gap: 8 }}>
-                                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
-                                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
-                                      const f = e.target.files[0];
-                                      if (f) {
-                                        const url = URL.createObjectURL(f);
-                                        setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, imageUrl: url } : r));
-                                      }
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+                                {(item.imageUrls || []).map((url, imgIdx) => (
+                                  <div key={imgIdx} style={{ position: "relative" }}>
+                                    <img src={url} style={{ height: 48, width: 48, objectFit: "cover", border: "1px solid #2a2a2a" }} />
+                                    <button onClick={() => setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, imageUrls: r.imageUrls.filter((_, j) => j !== imgIdx) } : r))}
+                                      style={{ position: "absolute", top: -4, right: -4, background: "#1a0505", border: "1px solid #5a1a1a", color: "#a05050", cursor: "pointer", fontSize: 8, width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>x</button>
+                                  </div>
+                                ))}
+                              </div>
+                              {(item.imageUrls || []).length < 4 && (
+                                <div style={{ display: "flex", gap: 6 }}>
+                                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
+                                    <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={e => {
+                                      const files = Array.from(e.target.files).slice(0, 4 - (item.imageUrls || []).length);
+                                      const urls = files.map(f => URL.createObjectURL(f));
+                                      setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, imageUrls: [...(r.imageUrls || []), ...urls].slice(0, 4) } : r));
                                     }} />
-                                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", textTransform: "uppercase", letterSpacing: 1.5 }}>+ Upload</span>
+                                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", letterSpacing: 1.5 }}>+ Upload</span>
                                   </label>
                                   {driveImages.length > 0 && (
                                     <button onClick={() => { setActiveImageCardIdx(idx); setShowImageLibrary(true); }}
-                                      style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", border: "1px dashed #2a2a2a", background: "none", cursor: "pointer" }}>
-                                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#c9a87c", textTransform: "uppercase", letterSpacing: 1.5 }}>Drive Library ({driveImages.length})</span>
+                                      style={{ display: "inline-flex", alignItems: "center", padding: "5px 10px", border: "1px dashed #2a2a2a", background: "none", cursor: "pointer" }}>
+                                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#c9a87c" }}>Drive ({driveImages.length})</span>
                                     </button>
                                   )}
                                   {driveImages.length === 0 && (
-                                    <button onClick={fetchDriveImages}
-                                      style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", border: "1px dashed #1a1a1a", background: "none", cursor: "pointer" }}>
-                                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", textTransform: "uppercase", letterSpacing: 1.5 }}>Load Drive</span>
+                                    <button onClick={fetchDriveImages} style={{ display: "inline-flex", alignItems: "center", padding: "5px 10px", border: "1px dashed #1a1a1a", background: "none", cursor: "pointer" }}>
+                                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444" }}>Load Drive</span>
                                     </button>
                                   )}
-                                </div>
-                              ) : (
-                                <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                                  <img src={item.imageUrl} alt="preview" style={{ height: 36, width: 36, objectFit: "cover", border: "1px solid #2a2a2a" }} />
-                                  <button onClick={() => setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, imageUrl: null } : r))} className="btn-danger" style={{ padding: "4px 8px", fontSize: 9 }}>Remove</button>
+                                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333", alignSelf: "center" }}>{(item.imageUrls || []).length}/4</span>
                                 </div>
                               )}
                             </div>
@@ -736,31 +740,41 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                                 </div>
                                 <div>
                                   <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 6 }}>IMAGE</div>
-                                  {!editDraft.imageUrl ? (
-                                    <div style={{ display: "flex", gap: 6 }}>
-                                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
-                                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) setEditDraft(d => ({ ...d, imageUrl: URL.createObjectURL(f) })); }} />
-                                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#555" }}>+ Upload</span>
-                                      </label>
-                                      {driveImages.length > 0 && (
-                                        <button onClick={() => { setActiveImageCardIdx("edit"); setShowImageLibrary(true); }}
-                                          style={{ display: "inline-flex", alignItems: "center", padding: "6px 10px", border: "1px dashed #2a2a2a", background: "none", cursor: "pointer" }}>
-                                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#c9a87c" }}>Drive</span>
-                                        </button>
-                                      )}
-                                      {driveImages.length === 0 && (
-                                        <button onClick={fetchDriveImages}
-                                          style={{ display: "inline-flex", alignItems: "center", padding: "6px 10px", border: "1px dashed #1a1a1a", background: "none", cursor: "pointer" }}>
-                                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444" }}>Load Drive</span>
-                                        </button>
-                                      )}
+                                  <div>
+                                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+                                      {(editDraft.imageUrls || []).map((url, imgIdx) => (
+                                        <div key={imgIdx} style={{ position: "relative" }}>
+                                          <img src={url} style={{ height: 40, width: 40, objectFit: "cover", border: "1px solid #2a2a2a" }} />
+                                          <button onClick={() => setEditDraft(d => ({ ...d, imageUrls: d.imageUrls.filter((_, j) => j !== imgIdx) }))}
+                                            style={{ position: "absolute", top: -4, right: -4, background: "#1a0505", border: "1px solid #5a1a1a", color: "#a05050", cursor: "pointer", fontSize: 8, width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>x</button>
+                                        </div>
+                                      ))}
                                     </div>
-                                  ) : (
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                      <img src={editDraft.imageUrl} style={{ height: 32, width: 32, objectFit: "cover", border: "1px solid #2a2a2a" }} />
-                                      <button onClick={() => setEditDraft(d => ({ ...d, imageUrl: null }))} className="btn-danger" style={{ padding: "3px 8px", fontSize: 9 }}>Remove</button>
-                                    </div>
-                                  )}
+                                    {(editDraft.imageUrls || []).length < 4 && (
+                                      <div style={{ display: "flex", gap: 6 }}>
+                                        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
+                                          <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={e => {
+                                            const files = Array.from(e.target.files).slice(0, 4 - (editDraft.imageUrls || []).length);
+                                            const urls = files.map(f => URL.createObjectURL(f));
+                                            setEditDraft(d => ({ ...d, imageUrls: [...(d.imageUrls || []), ...urls].slice(0, 4) }));
+                                          }} />
+                                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#555" }}>+ Upload</span>
+                                        </label>
+                                        {driveImages.length > 0 && (
+                                          <button onClick={() => { setActiveImageCardIdx("edit"); setShowImageLibrary(true); }}
+                                            style={{ display: "inline-flex", alignItems: "center", padding: "5px 10px", border: "1px dashed #2a2a2a", background: "none", cursor: "pointer" }}>
+                                            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#c9a87c" }}>Drive</span>
+                                          </button>
+                                        )}
+                                        {driveImages.length === 0 && (
+                                          <button onClick={fetchDriveImages} style={{ display: "inline-flex", alignItems: "center", padding: "5px 10px", border: "1px dashed #1a1a1a", background: "none", cursor: "pointer" }}>
+                                            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444" }}>Load Drive</span>
+                                          </button>
+                                        )}
+                                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333", alignSelf: "center" }}>{(editDraft.imageUrls || []).length}/4</span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 
@@ -842,9 +856,9 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                     <div key={img.id} onClick={() => {
                       const url = `https://drive.google.com/uc?export=view&id=${img.id}`;
                       if (activeImageCardIdx === "edit") {
-                        setEditDraft(d => ({ ...d, imageUrl: url }));
+                        setEditDraft(d => ({ ...d, imageUrls: [...(d.imageUrls || []), url].slice(0, 4) }));
                       } else {
-                        setBatchResults(prev => prev.map((r, i) => i === activeImageCardIdx ? { ...r, imageUrl: url } : r));
+                        setBatchResults(prev => prev.map((r, i) => i === activeImageCardIdx ? { ...r, imageUrls: [...(r.imageUrls || []), url].slice(0, 4) } : r));
                       }
                       setShowImageLibrary(false);
                     }} style={{ cursor: "pointer", border: "1px solid #1e1e1e", overflow: "hidden", aspectRatio: "1", transition: "border-color 0.2s" }}
