@@ -102,6 +102,12 @@ function getNextSchedule(existingQueue) {
       royal:      { label: "Royal",       desc: "Elevated, untouchable, speaks and expects obedience", color: "#a87cc9" },
     };
 
+    const LENGTHS = {
+      short:  { label: "Short",  desc: "1-2 sentences · under 100 chars", prompt: "LENGTH: SHORT. 1-2 sentences maximum. Under 100 characters ideally. Punchy. No fat." },
+      medium: { label: "Medium", desc: "2-3 sentences · 100-200 chars",   prompt: "LENGTH: MEDIUM. 2-3 sentences. 100-200 characters. Enough to land a point, not a word more." },
+      long:   { label: "Long",   desc: "Up to 280 chars · full texture",   prompt: "LENGTH: LONG. Up to 280 characters. Use for psychology reframes, standards posts, stories with texture. Still no padding." },
+    };
+
     const MOOD_PROMPTS = {
       feral: "MOOD: FERAL. Chaotic, playful, unhinged. Think: 'Heeeeere piggy piggy piggy.' Or the reframe: 'going on another date tonight lmaoooo time for my internet boyfriends to fund everything.' Silly cruelty. Real-life moments made absurd. Short and weird. Lower-case energy.",
       cold: "MOOD: COLD. Minimal. Devastating. State it and walk away. Examples: 'why are you messaging me without making my payment notifs go off' / 'psa: not a safe space for broke boys who negotiate' / 'worshipping my feet will fix you' / 'bow down to your god.' One sentence. No warmth. High repost value.",
