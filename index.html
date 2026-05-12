@@ -53,6 +53,8 @@
     const { useState, useEffect } = React;
 
     const BACKEND = "https://nox-scheduler-production.up.railway.app";
+const DRIVE_FOLDER_ID = "1erzIhdeQ9I2PrqZvRzo4or8Oql-6PHcs";
+const DRIVE_API = `https://www.googleapis.com/drive/v3/files?q='${DRIVE_FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&key=AIzaSyD-placeholder&fields=files(id,name,thumbnailLink,webContentLink)`;
 
 // Optimal posting times derived from engagement analysis of 790+ posts
 const DAILY_SLOTS = ["10:00", "12:00", "13:00", "14:00", "15:00", "18:00"];
@@ -194,7 +196,7 @@ LENGTH: Short wins hard. Under 60 characters = highest average engagement across
       return data.text || "";
     }
 
-    async function generateBatch({ mood, topic, notes, mode, platform, count }) {
+    async function generateBatch({ mood, topic, notes, mode, platform, count, length }) {
       const moodPrompt = MOOD_PROMPTS[mood] || "";
       const platformCtx = platform === "x" ? X_CONTEXT : REDDIT_CONTEXT;
       const input = mode === "topic" && topic
@@ -203,9 +205,12 @@ LENGTH: Short wins hard. Under 60 characters = highest average engagement across
         ? `Raw notes to draw from: "${notes}"`
         : "No specific topic — generate freely in this mood.";
 
+      const lengthPrompt = LENGTHS[length] ? LENGTHS[length].prompt : "";
       const prompt = `${PERSONA}
 
 ${moodPrompt}
+
+${lengthPrompt}
 
 ${platformCtx}
 
@@ -244,6 +249,7 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
       const [selectedMood, setSelectedMood] = useState("cold");
       const [platforms, setPlatforms] = useState({ x: true, reddit: false });
       const [adapted, setAdapted] = useState(false);
+      const [selectedLength, setSelectedLength] = useState('medium');
       const [batchCount, setBatchCount] = useState(6);
       const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().split("T")[0]);
       const [scheduledTime, setScheduledTime] = useState("09:00");
@@ -255,11 +261,28 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
 
       const [expandedId, setExpandedId] = useState(null);
       const [toast, setToast] = useState(null);
+      const [driveImages, setDriveImages] = useState([]);
+      const [showImageLibrary, setShowImageLibrary] = useState(false);
+      const [activeImageCardIdx, setActiveImageCardIdx] = useState(null);
 
       const showToast = (msg, type = "info") => {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3000);
       };
+
+      const fetchDriveImages = async () => {
+        try {
+          const res = await fetch(`${BACKEND}/drive-images`);
+          const data = await res.json();
+          setDriveImages(data.images || []);
+        } catch {
+          // silently fail - drive not configured
+        }
+      };
+
+      useEffect(() => {
+        fetchDriveImages();
+      }, []);
 
       useEffect(() => {
         const fetchQueue = async () => {
@@ -287,10 +310,10 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
           let xPosts = [], redditPosts = [];
 
           if (platforms.x) {
-            xPosts = await generateBatch({ mood: selectedMood, topic, notes, mode, platform: "x", count: batchCount });
+            xPosts = await generateBatch({ mood: selectedMood, topic, notes, mode, platform: "x", count: batchCount, length: selectedLength });
           }
           if (platforms.reddit) {
-            redditPosts = await generateBatch({ mood: selectedMood, topic, notes, mode, platform: "reddit", count: batchCount });
+            redditPosts = await generateBatch({ mood: selectedMood, topic, notes, mode, platform: "reddit", count: batchCount, length: selectedLength });
           }
 
           const today = new Date().toISOString().split("T")[0];
@@ -468,6 +491,17 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                     <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333", marginTop: 8 }}>posts per session</div>
                   </div>
                   <div>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 12 }}>Length</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {Object.entries(LENGTHS).map(([key, l]) => (
+                        <button key={key} onClick={() => setSelectedLength(key)} style={{ background: selectedLength === key ? "#1a1610" : "none", border: `1px solid ${selectedLength === key ? "#c9a87c" : "#2a2a2a"}`, color: selectedLength === key ? "#c9a87c" : "#555", fontFamily: "'DM Mono', monospace", fontSize: 10, padding: "6px 12px", cursor: "pointer", transition: "all 0.2s", textAlign: "left" }}>
+                          {l.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginTop: 8 }}>{LENGTHS[selectedLength].desc}</div>
+                  </div>
+                  <div>
                     <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 3, color: "#666", textTransform: "uppercase", marginBottom: 12 }}>Options</div>
                     <div className={`platform-toggle ${adapted ? "active" : ""}`} onClick={() => setAdapted(!adapted)}>
                       <div className={`checkbox ${adapted ? "checked" : ""}`}>{adapted ? "v" : ""}</div>
@@ -521,16 +555,30 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                           {!item.queued && (
                             <div style={{ marginTop: 8 }}>
                               {!item.imageUrl ? (
-                                <label style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
-                                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
-                                    const f = e.target.files[0];
-                                    if (f) {
-                                      const url = URL.createObjectURL(f);
-                                      setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, imageUrl: url } : r));
-                                    }
-                                  }} />
-                                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", textTransform: "uppercase", letterSpacing: 1.5 }}>+ Add Image</span>
-                                </label>
+                                <div style={{ display: "flex", gap: 8 }}>
+                                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
+                                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                                      const f = e.target.files[0];
+                                      if (f) {
+                                        const url = URL.createObjectURL(f);
+                                        setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, imageUrl: url } : r));
+                                      }
+                                    }} />
+                                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", textTransform: "uppercase", letterSpacing: 1.5 }}>+ Upload</span>
+                                  </label>
+                                  {driveImages.length > 0 && (
+                                    <button onClick={() => { setActiveImageCardIdx(idx); setShowImageLibrary(true); }}
+                                      style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", border: "1px dashed #2a2a2a", background: "none", cursor: "pointer" }}>
+                                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#c9a87c", textTransform: "uppercase", letterSpacing: 1.5 }}>Drive Library ({driveImages.length})</span>
+                                    </button>
+                                  )}
+                                  {driveImages.length === 0 && (
+                                    <button onClick={fetchDriveImages}
+                                      style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", border: "1px dashed #1a1a1a", background: "none", cursor: "pointer" }}>
+                                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", textTransform: "uppercase", letterSpacing: 1.5 }}>Load Drive</span>
+                                    </button>
+                                  )}
+                                </div>
                               ) : (
                                 <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                                   <img src={item.imageUrl} alt="preview" style={{ height: 36, width: 36, objectFit: "cover", border: "1px solid #2a2a2a" }} />
@@ -658,6 +706,41 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
             )}
 
           </main>
+
+          {/* Drive Image Library Modal */}
+          {showImageLibrary && (
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center" }}
+              onClick={() => setShowImageLibrary(false)}>
+              <div style={{ background: "#0d0d0d", border: "1px solid #2a2a2a", padding: 24, maxWidth: 600, width: "90%", maxHeight: "80vh", overflowY: "auto" }}
+                onClick={e => e.stopPropagation()}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, letterSpacing: 4, color: "#888", textTransform: "uppercase" }}>Ara Nox Posts</div>
+                  <button onClick={() => setShowImageLibrary(false)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 18 }}>×</button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                  {driveImages.map(img => (
+                    <div key={img.id} onClick={() => {
+                      const url = `https://drive.google.com/uc?export=view&id=${img.id}`;
+                      setBatchResults(prev => prev.map((r, i) => i === activeImageCardIdx ? { ...r, imageUrl: url } : r));
+                      setShowImageLibrary(false);
+                    }} style={{ cursor: "pointer", border: "1px solid #1e1e1e", overflow: "hidden", aspectRatio: "1", transition: "border-color 0.2s" }}
+                      onMouseOver={e => e.currentTarget.style.borderColor="#c9a87c"}
+                      onMouseOut={e => e.currentTarget.style.borderColor="#1e1e1e"}>
+                      {img.thumbnailLink
+                        ? <img src={img.thumbnailLink} alt={img.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        : <div style={{ width: "100%", height: "100%", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 8, color: "#444" }}>IMG</span>
+                          </div>
+                      }
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#333", marginTop: 16, letterSpacing: 1.5 }}>
+                  Add photos to your "Ara Nox Posts" Google Drive folder to see them here.
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
