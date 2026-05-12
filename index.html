@@ -54,6 +54,38 @@
 
     const BACKEND = "https://nox-scheduler-production.up.railway.app";
 
+// Optimal posting times derived from engagement analysis of 790+ posts
+const DAILY_SLOTS = ["10:00", "12:00", "13:00", "14:00", "15:00", "18:00"];
+const SLOTS_PER_DAY = 6;
+
+function getNextSchedule(existingQueue) {
+  // Count queued posts per date
+  const counts = {};
+  existingQueue.forEach(item => {
+    if (item.status === "queued") {
+      const d = item.scheduledDate || "unset";
+      counts[d] = (counts[d] || 0) + 1;
+    }
+  });
+
+  // Find today and future dates
+  const today = new Date();
+  for (let dayOffset = 0; dayOffset < 60; dayOffset++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + dayOffset);
+    const dateStr = d.toISOString().split("T")[0];
+    const usedSlots = counts[dateStr] || 0;
+    if (usedSlots < SLOTS_PER_DAY) {
+      return {
+        date: dateStr,
+        time: DAILY_SLOTS[usedSlots],
+      };
+    }
+  }
+  // Fallback
+  return { date: today.toISOString().split("T")[0], time: "10:00" };
+}
+
     const PLATFORMS = {
       x: { label: "X", color: "#e2e2e2" },
       reddit: { label: "Reddit", color: "#FF6314" },
@@ -69,12 +101,12 @@
     };
 
     const MOOD_PROMPTS = {
-      feral: "MOOD: FERAL. Chaotic, playful, unhinged energy. Think: 'Heeeeere piggy piggy piggy.' Silly cruelty. Animal sounds. Pure id. Short and weird.",
-      cold: "MOOD: COLD. Minimal. Devastating. One or two sentences maximum. No warmth. Just the fact. Like: 'SEND ME MONEY, STUPID.' or 'Kneel.' Cold water.",
-      soft_cruel: "MOOD: SOFT CRUEL. Warm underneath but with teeth. Calls them puppy or baby. Affectionate and controlling at once. Like: 'You can always come home, puppy.' Makes them feel wanted and owned simultaneously.",
-      findom: "MOOD: FINDOM. Money is mentioned casually, the way you'd mention weather. Not begging. Not announcing. Just matter-of-fact. Like: 'Oh you wanna get to know me? That costs money, honey.' Or: 'Good morning to all the teeny weeny boys working hard for my money.'",
+      feral: "MOOD: FERAL. Chaotic, playful, unhinged. Think: 'Heeeeere piggy piggy piggy.' Or the reframe: 'going on another date tonight lmaoooo time for my internet boyfriends to fund everything.' Silly cruelty. Real-life moments made absurd. Short and weird. Lower-case energy.",
+      cold: "MOOD: COLD. Minimal. Devastating. State it and walk away. Examples: 'why are you messaging me without making my payment notifs go off' / 'psa: not a safe space for broke boys who negotiate' / 'worshipping my feet will fix you' / 'bow down to your god.' One sentence. No warmth. High repost value.",
+      soft_cruel: "MOOD: SOFT CRUEL. Warm but controlling. Affectionate and possessive at once. Also includes psychology reframe — observations that make subs feel seen and slightly embarrassed. Examples: 'You can always come home, puppy.' 'don't be ashamed of your simpy urges, it's so hot when you show how weak you are' / 'it's hilarious watching men try to get over their submissive desires in therapy knowing full well the only cure is giving in' / 'a sub of mine hasn't had sex in 4 years since he met me.' Makes them feel understood and owned.",
+      findom: "MOOD: FINDOM. Money casual and specific. Real numbers, real scenarios. Top performers across accounts: 'someone sent me $333 to facetime my shoes — no, I will not video call you for $50' / 'I don't even have to get out of bed to make your monthly salary, and yet all you want is to give me more' / 'my besties stay rich due to the male loneliness epidemic' / 'you work hard, I enjoy the results.' Amused > demanding. Specific > vague.",
       slice: "MOOD: SLICE OF LIFE. A real moment, shared without context or explanation. Personal and specific. Like: 'I still have one of the chastity keys of one of my former subs. If I ever get the chance, I'm stealing the other key.' Or: 'Yes luxury bags are nice but I want a garden.'",
-      royal: "MOOD: ROYAL. Elevated, untouchable. She doesn't raise her voice because she doesn't need to. Speaks and expects to be obeyed. Dignified cruelty. Thinks of herself as the only logical authority in the room.",
+      royal: "MOOD: ROYAL. Elevated, untouchable. Pure declarative self-worship with zero apology. Top performing examples from this category: 'Self centered girls always win at life.' 'Struggling is so beneath me. That's a man's job.' 'Yes I am the prettiest girl in the world. Yes everyone should kiss the ground I walk on.' 'Women are the Gods of this earth.' Short. Stated like gravity. No explanation needed.",
     };
 
     const PERSONA = `You are writing as Ara Nox — a professional dominatrix posting on X.
@@ -117,10 +149,33 @@ Write in this exact voice. Primitive when primitive is right. Sharp when sharp i
 
     const X_CONTEXT = `Platform: X (Twitter)
 - Max 280 characters
-- Text-only
-- No external links
-- Do NOT force a question at the end. Commands, statements, and taunts also get replies.
-- A one-word post can outperform a paragraph. Trust the instinct to be brief.`;
+- No external links in post body
+
+WHAT ACTUALLY PERFORMS (analysis of 790+ posts across 3 high-follower Domme accounts — 13k, 22k, and 43k followers):
+
+CONTENT TYPES RANKED BY ENGAGEMENT:
+
+1. PHOTO + SHORT DIRECT-ADDRESS CAPTION — highest engagement by far (6-9x text-only). If a photo is attached write 2-7 words MAX, address him directly: "don't you want to be a good boy for me?" / "take a sip, walletboy" / "you fold so easily…" / "your purpose." / "get on your knees and worship." / "you work hard, I enjoy the results." The image does the work. Caption just pulls him in.
+
+2. DECLARATIVE SELF-WORSHIP — short, no qualification, stated like gravity. "Self centered girls always win at life." "Struggling is so beneath me. That's a man's job." "I love receiving money I didn't work for." "worshipping my feet will fix you." No explanation. No justification.
+
+3. SPECIFIC REAL STORIES with dollar amounts — "someone sent me $333 to facetime my shoes so no, I will not video call you for $50." Real numbers, real scenarios. Specificity makes it funny and believable.
+
+4. REFRAME MALE PSYCHOLOGY — observation posts that make subs feel seen and slightly embarrassed. High reply rate. "It's hilarious watching men try to get over their submissive desires in therapy." "it's interesting to see how many new simps have folded over this picture, men really do yearn to be treated like pets." "the most attractive men are professionally dominant and financially submissive."
+
+5. REFRAME MUNDANE LIFE AS FINDOM — "god forbid a girl has a hobby." "my besties stay rich due to the male loneliness epidemic." "going on a date tonight, time for my internet boyfriends to fund everything."
+
+6. STANDARDS/CALL-OUT posts — highest repost rate from other Dommes. "why are you messaging me without making my payment notifs go off." "psa: not a safe space for broke boys who negotiate."
+
+7. DESIRE STATED PLAINLY — "Craving a pink Chanel bag with $10k inside." "I want a garden." Specific wants, no asking.
+
+8. KINK-SPECIFIC references — chastity, control, specific dynamics land better than vague power statements.
+
+LENGTH: Short wins hard. Under 60 characters = highest average engagement across all three accounts.
+
+- Do NOT end with a question unless it's a tease directed at him
+- Specific > general. Always.
+- Photo attached = say almost nothing, address him directly`;
 
     const REDDIT_CONTEXT = `Platform: Reddit
 - Write a full post -- 2-4 paragraphs
@@ -257,12 +312,13 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
       };
 
       const handleQueueOne = async (item, idx) => {
+        const schedule = getNextSchedule(queue);
         const newItem = {
           topic: topic || `${MOODS[selectedMood].label} post`,
           platforms: { ...platforms },
           adapted,
-          scheduled: item.time || scheduledTime,
-          scheduledDate: item.date || scheduledDate,
+          scheduled: schedule.time,
+          scheduledDate: schedule.date,
           status: "queued",
           xCopy: item.xText,
           redditCopy: item.redditText,
@@ -457,10 +513,6 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                             {item.queued && <span style={{ color: "#4a9a4a", marginLeft: 8 }}>QUEUED</span>}
                           </span>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <input type="date" value={item.date} onChange={e => setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, date: e.target.value } : r))} disabled={item.queued}
-                              style={{ background: "#111", border: "1px solid #2a2a2a", color: "#c9a87c", fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "4px 8px", outline: "none", width: 140 }} />
-                            <input type="time" value={item.time} onChange={e => setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, time: e.target.value } : r))} disabled={item.queued}
-                              style={{ background: "#111", border: "1px solid #2a2a2a", color: "#c9a87c", fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "4px 8px", outline: "none", width: 100 }} />
                             {!item.queued && (
                               <button className="btn-success" onClick={() => handleQueueOne(item, idx)}>Queue</button>
                             )}
