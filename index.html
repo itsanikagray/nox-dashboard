@@ -737,10 +737,24 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                                 <div>
                                   <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444", marginBottom: 6 }}>IMAGE</div>
                                   {!editDraft.imageUrl ? (
-                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
-                                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) setEditDraft(d => ({ ...d, imageUrl: URL.createObjectURL(f) })); }} />
-                                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#555" }}>+ Add</span>
-                                    </label>
+                                    <div style={{ display: "flex", gap: 6 }}>
+                                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", border: "1px dashed #2a2a2a", cursor: "pointer" }}>
+                                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) setEditDraft(d => ({ ...d, imageUrl: URL.createObjectURL(f) })); }} />
+                                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#555" }}>+ Upload</span>
+                                      </label>
+                                      {driveImages.length > 0 && (
+                                        <button onClick={() => { setActiveImageCardIdx("edit"); setShowImageLibrary(true); }}
+                                          style={{ display: "inline-flex", alignItems: "center", padding: "6px 10px", border: "1px dashed #2a2a2a", background: "none", cursor: "pointer" }}>
+                                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#c9a87c" }}>Drive</span>
+                                        </button>
+                                      )}
+                                      {driveImages.length === 0 && (
+                                        <button onClick={fetchDriveImages}
+                                          style={{ display: "inline-flex", alignItems: "center", padding: "6px 10px", border: "1px dashed #1a1a1a", background: "none", cursor: "pointer" }}>
+                                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#444" }}>Load Drive</span>
+                                        </button>
+                                      )}
+                                    </div>
                                   ) : (
                                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                       <img src={editDraft.imageUrl} style={{ height: 32, width: 32, objectFit: "cover", border: "1px solid #2a2a2a" }} />
@@ -827,7 +841,11 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                   {driveImages.map(img => (
                     <div key={img.id} onClick={() => {
                       const url = `https://drive.google.com/uc?export=view&id=${img.id}`;
-                      setBatchResults(prev => prev.map((r, i) => i === activeImageCardIdx ? { ...r, imageUrl: url } : r));
+                      if (activeImageCardIdx === "edit") {
+                        setEditDraft(d => ({ ...d, imageUrl: url }));
+                      } else {
+                        setBatchResults(prev => prev.map((r, i) => i === activeImageCardIdx ? { ...r, imageUrl: url } : r));
+                      }
                       setShowImageLibrary(false);
                     }} style={{ cursor: "pointer", border: "1px solid #1e1e1e", overflow: "hidden", aspectRatio: "1", transition: "border-color 0.2s" }}
                       onMouseOver={e => e.currentTarget.style.borderColor="#c9a87c"}
