@@ -157,34 +157,48 @@ Voice rules:
 Write in this exact voice. Primitive when primitive is right. Sharp when sharp is right. Always short. Always hers.`;
 
     const X_CONTEXT = `Platform: X (Twitter)
-- No external links in post body
-- This account has X Premium — posts can be up to 25,000 characters, not just 280
+- No external links in post body — 30-50% reach penalty. Never include them.
+- This account has X Premium — posts can be up to 25,000 characters AND get ~10x more reach than free accounts
 
-WHAT ACTUALLY PERFORMS (analysis of 790+ posts across 3 high-follower Domme accounts — 13k, 22k, and 43k followers):
+2026 ALGORITHM WEIGHTS (open-sourced, confirmed May 2026):
+Reply where author replies back = +75 (THE most powerful signal — 150x a like)
+Reply = +13.5
+Profile click + engagement = +12.0
+Bookmark = +10.0 (massively underrated — design for saves)
+Retweet = +1.0
+Like = +0.5 (lowest value — never optimize for likes)
 
-CONTENT TYPES RANKED BY ENGAGEMENT:
+WHAT THIS MEANS FOR EVERY POST:
+- Design to provoke a REPLY, not a like. Replies are worth 27x likes.
+- BOOKMARKABLE posts get disproportionate reach. Standards, specific stories, psychology observations = bookmark bait.
+- First 30 minutes is everything — 10+ engagements triggers viral amplification. Post during peak hours.
+- Grok sentiment analysis rewards ASSERTIVE/CONSTRUCTIVE tone. Pure combative aggression gets throttled even with high engagement. Confident and commanding = fine. Pure hostility = penalized.
+- Hashtags are deprecated — Grok reads content semantically. Zero hashtags is fine. 3+ triggers spam filter.
+- Text-only posts outperform video by 30% on X — unique to this platform.
+- Long-form single posts now treated MORE favorably than threads since January 2026.
 
-1. PHOTO + SHORT DIRECT-ADDRESS CAPTION — highest engagement by far (6-9x text-only). If a photo is attached write 2-7 words MAX, address him directly: "don't you want to be a good boy for me?" / "take a sip, walletboy" / "you fold so easily…" / "your purpose." / "get on your knees and worship." / "you work hard, I enjoy the results." The image does the work. Caption just pulls him in.
+ENGAGEMENT BAIT vs GENUINE PROVOCATION:
+- PENALIZED: "Like if you agree" / "RT if you think so" — mechanical bait
+- NOT PENALIZED: Rhetorical questions, incomplete thoughts, provocations, teasing questions from a position of power
+- Key distinction for this voice: "you know you need this, don't you?" (commanding) is better than "do you need this?" (sounds like asking for validation)
 
-2. DECLARATIVE SELF-WORSHIP — short, no qualification, stated like gravity. "Self centered girls always win at life." "Struggling is so beneath me. That's a man's job." "I love receiving money I didn't work for." "worshipping my feet will fix you." No explanation. No justification.
+WHAT ACTUALLY PERFORMS (analysis of 790+ posts across 3 high-follower Domme accounts):
 
-3. SPECIFIC REAL STORIES with dollar amounts — "someone sent me $333 to facetime my shoes so no, I will not video call you for $50." Real numbers, real scenarios. Specificity makes it funny and believable.
+1. PHOTO + SHORT DIRECT-ADDRESS CAPTION — confirmed 2x algorithmic multiplier for image posts. Algorithm also predicts P(photo_expand) — whether people tap to expand the photo. A compelling image that stops the scroll AND gets expanded stacks the image multiplier on top of reply/bookmark signals. 2-7 words max if photo attached. Address him directly: "you fold so easily..." / "your purpose." / "take a sip, walletboy" — caption should make him want to expand the photo AND reply.
 
-4. REFRAME MALE PSYCHOLOGY — observation posts that make subs feel seen and slightly embarrassed. High reply rate. "It's hilarious watching men try to get over their submissive desires in therapy." "it's interesting to see how many new simps have folded over this picture, men really do yearn to be treated like pets." "the most attractive men are professionally dominant and financially submissive."
+2. REPLY-PROVOKING STATEMENTS — posts that make him feel seen, called out, or compelled to respond without asking directly. Psychology reframes perform especially well here: "men really do yearn to be treated like pets." He will reply.
 
-5. REFRAME MUNDANE LIFE AS FINDOM — "god forbid a girl has a hobby." "my besties stay rich due to the male loneliness epidemic." "going on a date tonight, time for my internet boyfriends to fund everything."
+3. BOOKMARKABLE STANDARDS POSTS — high bookmark rate = high algorithmic distribution. State a standard plainly. No softening. "why are you messaging me without making my payment notifs go off."
 
-6. STANDARDS/CALL-OUT posts — highest repost rate from other Dommes. "why are you messaging me without making my payment notifs go off." "psa: not a safe space for broke boys who negotiate."
+4. SPECIFIC REAL STORIES with dollar amounts — "someone sent me $333 to facetime my shoes so no, I will not video call you for $50." Specificity = funny and believable.
 
-7. DESIRE STATED PLAINLY — "Craving a pink Chanel bag with $10k inside." "I want a garden." Specific wants, no asking.
+5. DECLARATIVE SELF-WORSHIP — stated like gravity. "Struggling is so beneath me." "Self centered girls always win at life." No explanation.
 
-8. KINK-SPECIFIC references — chastity, control, specific dynamics land better than vague power statements.
+6. REFRAME MUNDANE LIFE AS FINDOM — "my besties stay rich due to the male loneliness epidemic." "god forbid a girl has a hobby."
 
-LENGTH: Short wins hard. Under 60 characters = highest average engagement across all three accounts.
+7. DESIRE STATED PLAINLY — specific wants, no asking. "I want a garden." "Craving a pink Chanel bag with $10k inside."
 
-- Do NOT end with a question unless it's a tease directed at him
-- Specific > general. Always.
-- Photo attached = say almost nothing, address him directly`;
+LENGTH: Short wins. Under 100 characters = highest average engagement. Long-form (300-600 chars) works for psychology reframes and stories. Threads deprecated in favor of single long posts.`;
 
     const REDDIT_CONTEXT = `Platform: Reddit
 - Write a full post -- 2-4 paragraphs
@@ -261,6 +275,7 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
       const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().split("T")[0]);
       const [scheduledTime, setScheduledTime] = useState("09:00");
       const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+      const [autoAttachDrive, setAutoAttachDrive] = useState(false);
       const [generating, setGenerating] = useState(false);
 
       // Batch results
@@ -559,11 +574,20 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
 
 
 
-                {/* GENERATE */}
-                <div style={{ marginBottom: 36 }}>
+                {/* AUTO-ATTACH + GENERATE */}
+                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 36, flexWrap: "wrap" }}>
                   <button className="btn-primary" onClick={handleGenerate} disabled={generating || (!platforms.x && !platforms.reddit)}>
                     {generating ? "Generating..." : `Generate ${batchCount} Posts`}
                   </button>
+                  <div className={`platform-toggle ${autoAttachDrive ? "active" : ""}`} onClick={() => {
+                    if (driveImages.length === 0) { fetchDriveImages(); }
+                    setAutoAttachDrive(!autoAttachDrive);
+                  }} style={{ padding: "8px 14px" }}>
+                    <div className={`checkbox ${autoAttachDrive ? "checked" : ""}`}>{autoAttachDrive ? "v" : ""}</div>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: autoAttachDrive ? "#c9a87c" : "#444", letterSpacing: 1 }}>
+                      Auto-attach from Drive {driveImages.length > 0 ? `(${driveImages.length} available)` : ""}
+                    </span>
+                  </div>
                 </div>
 
                 {/* BATCH RESULTS */}
