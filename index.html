@@ -227,7 +227,22 @@ LENGTH: Short wins. Under 100 characters = highest average engagement. Long-form
         : "No specific topic — generate freely in this mood.";
 
       const lengthPrompt = LENGTHS[length] ? LENGTHS[length].prompt : "";
-      const prompt = `${PERSONA}
+
+      // Build voice training context from saved edits
+      let voiceContext = "";
+      if (voiceExamples && voiceExamples.length > 0) {
+        const relevantExamples = voiceExamples
+          .filter(e => !mood || e.mood === mood || !e.mood)
+          .slice(0, 15);
+        if (relevantExamples.length > 0) {
+          voiceContext = `\n\nVOICE TRAINING — Learn from these real edits. Left is what AI wrote, right is how she actually talks. Study the pattern and write like the right side.\n` +
+            relevantExamples.map((e, i) =>
+              `${i+1}. AI wrote: "${e.original}"\n   She changed it to: "${e.edited}"`
+            ).join("\n");
+        }
+      }
+
+      const prompt = `${PERSONA}${voiceContext}
 
 ${moodPrompt}
 
@@ -276,6 +291,7 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
       const [scheduledTime, setScheduledTime] = useState("09:00");
       const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
       const [autoAttachDrive, setAutoAttachDrive] = useState(false);
+      const [voiceExamples, setVoiceExamples] = useState([]);
       const [generating, setGenerating] = useState(false);
 
       // Batch results
@@ -306,6 +322,11 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
 
       useEffect(() => {
         fetchDriveImages();
+        // Load voice training examples
+        fetch(`${BACKEND}/voice-training?platform=x&limit=25`)
+          .then(r => r.json())
+          .then(d => setVoiceExamples(d.examples || []))
+          .catch(() => {});
       }, []);
 
       useEffect(() => {
@@ -323,6 +344,21 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
         const interval = setInterval(fetchQueue, 30000);
         return () => clearInterval(interval);
       }, []);
+
+      const saveVoiceEdit = async (original, edited, mood, platform = "x") => {
+        if (!original || !edited || original.trim() === edited.trim()) return;
+        try {
+          await fetch(`${BACKEND}/voice-training`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ original, edited, mood, platform }),
+          });
+          // Refresh examples
+          const res = await fetch(`${BACKEND}/voice-training?platform=x&limit=25`);
+          const data = await res.json();
+          setVoiceExamples(data.examples || []);
+        } catch {}
+      };
 
       const handleGenerate = async () => {
         setGenerating(true);
@@ -346,6 +382,8 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
             id: Date.now() + i,
             xText: xPosts[i] || "",
             redditText: redditPosts[i] || "",
+            _originalXText: xPosts[i] || "",
+            _originalRedditText: redditPosts[i] || "",
             queued: false,
             date: today,
             time: "09:00",
@@ -480,6 +518,9 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                 </span>
               </div>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#333" }}>{queuedItems.length} queued</span>
+              {voiceExamples.length > 0 && (
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, color: "#444" }}>{voiceExamples.length} voice edits</span>
+              )}
             </div>
           </header>
 
@@ -668,6 +709,11 @@ Only the post text after the number. No labels, no quotes, no explanation.`;
                             <textarea
                               value={item.xText}
                               onChange={e => setBatchResults(prev => prev.map((r, i) => i === idx ? { ...r, xText: e.target.value } : r))}
+                              onBlur={e => {
+                                if (item._originalXText && e.target.value !== item._originalXText) {
+                                  saveVoiceEdit(item._originalXText, e.target.value, selectedMood, "x");
+                                }
+                              }}
                               disabled={item.queued}
                               style={{ width: "100%", background: "transparent", border: "none", borderBottom: "1px solid #1e1e1e", color: "#c8c4bc", fontFamily: "'Georgia', serif", fontSize: 14, lineHeight: 1.65, padding: "8px 0", resize: "none", outline: "none", rows: 3 }}
                               rows={Math.max(2, Math.ceil(item.xText.length / 60))}
